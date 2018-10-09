@@ -16,7 +16,7 @@
 
 __author__ = "Sami-Pekka Hallikas"
 __email__ = "semi@hallikas.com"
-__date__ = "09.10.2018"
+__date__ = "10.10.2018"
 __version__ = "0.8-devel"
 
 import os
@@ -29,23 +29,22 @@ import subprocess
 import glob
 
 # Directory ID to save downloaded files
-doneDir = 7693967
-# Directory ID to save failed downloads
-failDir = 10218902
+# **TODO** - Possibility to use NAME as target. Also CREATE if does not exist.
+doneDir = 7693967 
 
-#dirPrefix = "_new_/"
-dirPrefix = ""
-
+# username, password and apiKey are not used here, those are loaded from
+# elisa-dl.conf file now.
 # Personal username and password for Elisa Viihde, you should NOT
 # share this information to anyone!
-username = '*ELISA VIIHDE USERNAME*'
-password = '*ELISA VIIHDE PASSWORD*'
+username='* Elisa-viihde käyttäjätunnus *'
+password='* Elisa-viihde salasana *'
 
-# Api Developer parameters. Please change to your own if you have one.
-apiKey = '*ELISA VIIHDE DEVELOPER API KEY*'
-clientSecret = 'nZhkFGz8Zd8w'
+# Api Developer parameters. Please change to your own.
+# You may try requesting one from Elisa or ask permission to use mine.
+apiKey='* Oma API avaimesi Elisa-Viihde palveluun *'
 
 # You should not touch these!
+clientSecret = 'nZhkFGz8Zd8w'
 apiUrl='https://api-viihde-gateway.dc1.elisa.fi/rest/npvr'
 apiPlat='platform=external'
 apiVer='v=2.1&appVersion=1.0'
@@ -58,7 +57,6 @@ reqHeaders = {}
 accessCode = {}
 accessToken = {}
 
-doOnlyFormats = False
 has_match=False
 lookforcheck = 0
 
@@ -82,6 +80,23 @@ def lookfor(istype, whatstr, fromstr):
 		has_match = True
 	return fromstr
 
+#
+#
+# This part is probably most interesting, it takes TITLE and DESCRIPTION of program.
+# Then it tries to make 'clever' filenames just by comparing information it can get.
+# Lots of regexp and rewrite needed.
+#
+# Example:
+# Title: Elokuva: Pikku naisia (S)
+# Description:
+#              (Little Women, draama, USA, 1994) Louisa May Alcottin
+#              klassikkoromaaniin perustuva valloittava draama sijoittuu
+#              1800-luvun loppupuolelle ja kertoo Marchin perheestä ja sen
+#              neljän tyttären vaiheista nuoruusvuosista aikuistumisen
+#              kynnykselle saakka.  105 min
+# 
+# Filename -> Little Women - Pikku naisia (1994)
+#
 def fixname(t, d):
 	global lookforcheck
 	global has_match
@@ -193,15 +208,19 @@ def fixname(t, d):
 
 ### NOT MOVIE OR EPISODE? Maybe we have eptitle anyway?
 	if not v.has_key('type'):
+# If known series
 		if v['title'] in ['Ihmemies MacGyver', 'Myytinmurtajat']:
 			v['type'] = 'Series'
 		else:
+# We know that " O: " and " N: " in description is for director and lead
+# woman.  Usually indication of movie.
 			a=re.search(' [ON]: ', v['description'])
 			if a:
 				v['type'] = "Movie"
 			else:
 				v['type'] = 'Unknown'
 
+# If description starts with "Osa" and number, that means episode.
 	a=re.search("^Osa (?P<episode>\d+)\. ?(?P<description>.*)$", v['description'])
 	if a:
 		v['type'] = 'Series'
@@ -230,6 +249,8 @@ def fixname(t, d):
 	if v['type'] in ['Movie']:
 		if not v.has_key('year'): v['year'] = 'xxxx'
 
+# We want to move The and a AFTER title, like:
+# "Martian, The - Yksin Marsissa (2015)" so file sort would work.
 		t = re.sub(r'^(The|a) (.+)$', '\g<2>, \g<1>', t, re.IGNORECASE)
 		if not v.has_key('name'):
 			v['name'] = t
@@ -252,7 +273,7 @@ def fixname(t, d):
 	if v['type'] == "Series":
 		filename = "%s/%s/%s" % (v['type'].lower(), v['title'], v['name'])
 
-	return dirPrefix+filename
+	return filename
 
 ## Save python variable to file
 def save_vars(var, fname, id=None):
@@ -292,8 +313,7 @@ def load_vars(fname, id=None):
 	if raw: vars["raw"] = raw
 	return vars
 
-##
-## Few functions to help debug
+# Few functions to help debug, dump and show_vars
 def dump(obj):
 	for attr in dir(obj):
 		if hasattr( obj, attr ):
@@ -355,21 +375,8 @@ def show_vars(var, lvl=0):
 	else:
 		st += "\'%s\'" % re.sub("\'", "\\\'", str(var))
 	return st
-
-
-## Modify given string to be OS path friendly
-def cleanStrPath(var):
-	var = os.path.normpath(os.path.normcase(re.sub(r'[\\/*?:"<>|]',"_",var.lower())))
-	return var
-
-## Modify given string to be used as filename
-def cleanStrFile(var):
-	var = re.sub(r'(19|2\d)(\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d\)',r'\1\2\3\4_\5\6)',var)
-	var = re.sub(r'^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',var)
-	var = re.sub(r': ',' - ',var)
-	var = re.sub(r'[\\/*?:"<>|]',"_",var)
-	return var
-
+##
+## API Functions
 def doApiProcess(ret = None):
 #	print "_doApiProcess()"
 	r={}
@@ -386,9 +393,10 @@ def doApiProcess(ret = None):
 		r['headers']['X-RateLimit-Limit-minute'] = ret.headers['X-RateLimit-Limit-minute']
 		r['headers']['X-RateLimit-Remaining-minute'] = ret.headers['X-RateLimit-Remaining-minute']
 
-	print "RateLimit:",
-	print "sec: "+r['headers']['X-RateLimit-Remaining-second']+'/'+r['headers']['X-RateLimit-Limit-second'],
-	print "min: "+r['headers']['X-RateLimit-Remaining-minute']+'/'+r['headers']['X-RateLimit-Limit-minute']
+# Print ratelimit information, for debug purpouses when doing multiple requests
+#	print "RateLimit:",
+#	print "sec: "+r['headers']['X-RateLimit-Remaining-second']+'/'+r['headers']['X-RateLimit-Limit-second'],
+#	print "min: "+r['headers']['X-RateLimit-Remaining-minute']+'/'+r['headers']['X-RateLimit-Limit-minute']
 
 	if int(r['headers']['X-RateLimit-Remaining-second']) < 1:
 		print "Throttling because RateLimit"
@@ -410,8 +418,8 @@ def doApiProcess(ret = None):
 #	print "/doApiProcess()"
 	return r
 
+# API POST function
 def doApiPost(url, data=false):
-#	print "_doApiPost()"
 	if auth:
 		reqHeaders = auth
 	else:
@@ -423,28 +431,10 @@ def doApiPost(url, data=false):
 		ret = requests.post(url, headers=reqHeaders)
 	r = doApiProcess(ret)
  	s = json.loads(ret.text)
-#	print "/doApiPost()"
  	return (r,s)
 
-def moveRecord(programId, folderId=doneDir):
-#	print "_moveRecord()"
-#	print auth
-	if not auth:
-		print "Missing Authentication"
-		sys.exit(1)
-
-	headers = auth
-	headers['content-type'] = 'application/x-www-form-urlencoded'
-	try:
-		ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (programId, folderId), headers=headers)
-		r = doApiProcess(ret)
-	except:
-		pass
-#	print "/moveRecord()"
-	return
-
+# API GET function
 def doApiGet(url, data=false):
-#	print "_doApiGet()"
 	if not auth:
 		print "Missing Authentication"
 		sys.exit(1)
@@ -452,22 +442,21 @@ def doApiGet(url, data=false):
 	ret = requests.get(url, headers=auth)
 	r = doApiProcess(ret)
  	s = json.loads(ret.text)
-#	print "/doApiGet()"
  	return (r,s)
 
+# Get access code for access token
 def getAccessCode():
-#	print "_getAccessCode()"
 	ret = requests.post('https://api-viihde-gateway.dc1.elisa.fi/auth/authorize/access-code',
 		json = {'client_id': 'external', 'client_secret': clientSecret, 'response_type': 'code', 'scopes': []},
 		headers = {'content-type': 'application/json', 'apikey': apiKey})
-#	print "/getAccessCode()"
  	return json.loads(ret.text)['code']
 
+# This is something that you don't have to do very often. API documentation says that token is just fine for 30 days :)
+# **TODO** Well, I hope my expire code just works :D
 def getAccessToken():
-#	print "_getAccessToken()"
 	token={}
-	if os.path.exists("access.var"):
-		token = load_vars("access.var")
+	if os.path.exists("var/access.var"):
+		token = load_vars("var/access.var")
 		if token.has_key("expires") and float(token["expires"]) <= float(time.time()):
 			del token['access_token']
 	if not token.has_key('access_token'):
@@ -488,51 +477,47 @@ def getAccessToken():
 		token['access_token'] = str(s['access_token'])
 	 	token['refresh_token'] = str(s['refresh_token'])
 	 	token['expires'] = "%.0f" % (float(time.time()) + float(s['expires_in']))
- 	 	save_vars(token, "access.var")
-
-#	print "/getAccessToken()"
+ 	 	save_vars(token, "var/access.var")
 	return "%s %s" % (token['token_type'], token['access_token'])
 
+# login function should return headers to do authorization
 def login():
 #	print "login()"
 	return {'Authorization': getAccessToken(), 'apikey': apiKey}
 
+# Do download.
 def doDownload(filename, recordingUrl):
+# Print some debug info
 	print "doDownload(%s, %s)" % (filename, recordingUrl)
 # Get with ffmpeg, best video and audio, BIG file
-	if not os.path.exists(filename + '_ffmeg.mp4'):
-		cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '_ffmpeg.mp4\"'
+# On Windows system this can cause problems, I have one report about it.
+	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
 # Get best of > 720p (HD)
-	if not os.path.exists(filename + ' (HD).mp4'): 
-		cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + ' (HD).%(ext)s\" \"' + recordingUrl + '\"' )
+	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 # Get best of <= 720p, with standard audio (or best)
-	if not os.path.exists(filename + '.mp4'):
-		cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?720])+(audio-aacl-192-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# Get best video that is less then 3MBit/s bitrate
-#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?999])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?720])+(audio-aacl-192-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# Well, get ANYTHING less then 1000px (1920x1080) is too big for this ;)
+#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?999])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# Get best video that is less then 3Mbit/s bitrate. I think that 6Mbit/s it soo much, I can live with 720p
+	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# Note! last cmd wins.
 
 	print cmd
+# Write our status to elisa-dl.log
 	file=open("elisa-dl.log", 'a')
 	file.write("CMD: %s\n" % cmd)
 	file.close()
 
+# Just my own debug interrupt
+	if os.path.exists("not-download"):
+		sys.exit(0)
+# Execute downloading
 	os.system(cmd)
+	return
 
-def init_system():
-	if not os.path.exists('_/var'):
-		try:
-			os.makedirs('_/var', 0755)
-		except:
-			pass
-	if not os.path.exists('tmp'):
-		try:
-			os.makedirs("tmp", 0755)
-		except:
-			pass
-
+# Get data about all folders.
 def getFolders():
-	if not os.path.exists("_/var/save-fData.var"):	
+	if not os.path.exists("var/cache-fData.var"):	
 		(r, getData) = doApiGet(apiUrl+'/folders'+'?'+apiPlat+'&'+apiVer)
 		if (r["status"] != 200):
 			print "Failed to load folders data",getData.status_code
@@ -540,134 +525,147 @@ def getFolders():
 
 		fData = {getData["id"]: {"name": getData["name"], "count": getData["recordingsCount"]}}
 		for f in getData["folders"]:
-#			if(f["recordingsCount"] > 0 and (f["name"] != "aDone" and f["name"] != "Fail")):
 			fData[f["id"]] = {"name": f["name"], "count": f["recordingsCount"]}
-		save_vars(fData, "_/var/save-fData.var")
-	fData=load_vars("_/var/save-fData.var")
-
+		save_vars(fData, "var/cache-fData.var")
+	fData=load_vars("var/cache-fData.var")
 	return fData
 
 def getFolder(folderId):
-	if not os.path.exists("_/var/save-fData-%d.var" % folderId):
+# Do we have cached data for folder?
+# **TODO** Expire!
+	if not os.path.exists("var/cache-fData-%d.var" % folderId):
+# Do API Request, notice EXTRA big pageSize and includeMetadata
+# **TODO** We should sort data somehow... maybe when processing
 		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?'+apiPlat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
+# We don't have error handling. If status is NOT 200, just report error and quit
 		if (r["status"] != 200):
 			print "Failed to load recording data for folder %d" % (folderId), r["status"]
 			sys.exit(1)
 		rData = {}
+# full data about single program lies in getData["recordings"][programId["programId"])
 		for r in getData["recordings"]:
+# **TODO** I don't get that code below, is it stupid?  I think that r =
+# programId.  But why we set it back to r?..  I must rethink this.
 			rData[r["programId"]] = r
-		save_vars(rData, "_/var/save-rData-%d.var" % folderId)
-	rData=load_vars("_/var/save-rData-%d.var" % folderId)
+# Save cached data
+		save_vars(rData, "var/cache-rData-%d.var" % folderId)
+# Load cached data to variable and return from function
+	rData=load_vars("var/cache-rData-%d.var" % folderId)
 	return rData
 
-def makeFileName(r):
-	try:
-		fPath = '_/%s' % cleanStrPath(r['showType'])
-	except:
-		fPath = '_/unknown'
+# Move programId to another folderId
+def moveRecord(programId, folderId=doneDir):
+	if not auth:
+		print "Missing Authentication"
+		sys.exit(1)
 
-	fName = cleanStrFile(r["name"] +" ("+r["startTime"]+")")
-
-	if r.has_key("seriesId") and r["seriesId"] > 0:
-		if r.has_key("series") and r["series"].has_key("season") and r["series"].has_key("episode"):
-			fName = cleanStrFile("%s - S%02dE%02d - %s (%s)" % (r["series"]["title"], r["series"]["season"], r["series"]["episode"], r["series"]["episodeName"], r["startTime"]))
+	headers = auth
+	headers['content-type'] = 'application/x-www-form-urlencoded'
 	try:
-		os.makedirs(fPath, 0755)
+		ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (programId, folderId), headers=headers)
+		r = doApiProcess(ret)
 	except:
+# **TODO** We don't have exception handling, YET
 		pass
+	return
 
-	filename=fPath+'/'+fName
-	return filename
-
+#
+# Check if we have quit conditions, for nice end of the program.
 def checkQuit():
 	if os.path.exists("/quit") or os.path.exists("quit"):
 		print "Quit requested"
 		sys.exit(0)
 
-
-
-
-
-
-
-
-#if __name__ == "__main__":
-#	os.nice(5)
-#	f=load_vars('_/var/save-fullData.var');
-
-#### This part I have used when I did rename OLD files
-#
-#	for a in f:
-#		if f[a].has_key('program') and len(f[a]['program']) > 0:
-#			for p, d in f[a]['program'].items():
-##				if p != 11960662: continue
-#				c=makeFileName(d)
-#				g=glob.glob(c+"*")
-#				if g:
-#					c=re.sub('\(','\\(',c)
-#					c=re.sub('\)','\\)',c)
-#					ext=[]
-#					print
-#					print "mkdir -p '%s'" % re.sub('/[\d\wöäåÖÄÅøé\' ,:&\-\.]+$','',fixname(d['name'],d['description']))
-#					for e in g:
-#						src=re.sub('\'','\\\'',e)
-#						dst=fixname(d['name'],d['description'])
-#						ext=re.sub(c,'',e)
-#						print "mv -vi '%s' '%s'" % (e, dst+ext)
-##				if p == 11960662: sys.exit(1)
-#sys.exit(0)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+###
+### MAIN CODE STARTS FROM HERE!
+###
 if __name__ == "__main__":
-	if not os.path.exists("_/var/save-fullData.var"):
-		init_system()
+	if not os.path.exists("elisa-dl.conf"):
+		print "You should copy elisa-dl.sample.conf to elisa-dl.conf"
+		print "And edit it to contain your Elisa-Viihde username and password"
+		print "Also you need to provide apikey"
+		print
+		sys.exit(1)
+	fp = open("elisa-dl.conf", 'r')
+	while 1:
+		line = fp.readline()
+		if len(line) < 1: break
+		a=re.search('^username\s*=\s*(?P<user>[\w\d]+)',line,re.IGNORECASE)
+		if a: username=a.groupdict()['user']
+		a=re.search('^password\s*=\s*(?P<pass>[\w\d]+)',line,re.IGNORECASE)
+		if a: password=a.groupdict()['pass']
+		a=re.search('^apikey\s*=\s*(?P<apikey>[\w\d]+)',line,re.IGNORECASE)
+		if a: apiKey=a.groupdict()['apikey']
+	fp.close()
 
+# Mahe cache directory
+	if not os.path.exists('var'): os.makedirs('var', 0755)
+# Make temp download directory
+	if not os.path.exists('tmp'): os.makedirs('tmp', 0755)
+
+# Check if we have fullData cached
+# **TODO** Expire for cached data.
+	if not os.path.exists("var/cache-fullData.var"):
+# Log into Elisa system
 		auth = login()
+# Get data about folders
 		fData = getFolders()
-
+# Set fullData base structre from folder data
 		fullData = fData
+# Loop thru folders
 		for f in fData:
+# Show folder ID and Name, mainly for debugging
 			print "Directory %d: %s" % (f, fData[f]["name"])
+# Read data about PROGRAM from folder
 			rData = getFolder(f)
-			fullData[f]["program"] = rData
 			if len(rData) == 0: continue
+# Create entry for program in fullData
+			fullData[f]["program"] = rData
 			for r in rData:
 				r=rData[r]
-		save_vars(fullData, "_/var/save-fullData.var")
-	fullData = load_vars("_/var/save-fullData.var")
+# Save cached data to disk
+		save_vars(fullData, "var/cache-fullData.var")
+# Load cached data.  We could skip this (if cache is created), but I want to
+# keep this so we can detect problems. With cache handling.
+	fullData = load_vars("var/cache-fullData.var")
+## **TODO** Verify cache
+## - Load directory information (fData) from Elisa
+## - Reload directory data if does not match
 
 ##
 ## Login and download
 	if len(auth) == 0: auth = login()
+# Loop thru full data (cached), by folders
 	for a in fullData:
 		folderId=a
-		if folderId in [doneDir, failDir, 0]: continue
-		if folderId not in [8037870, 0]: continue
-		a = fullData[a]
-		if a['count'] < 1: continue
-		i=0
+# Loop if we don't have program entries.
+		if fullData[folderId]['count'] < 1: continue
+# Skip doneDir
+		if folderId in [doneDir]: continue
+#
+# **TODO** My own debug - Do ONLY THESE
+#
+#		if folderId not in [8037870, 0]: continue
+
+# For now, a-variable contains id of entry on fullData. But we like to hand
+# as it would be data of fullData[a]. So we assign it.
+# **TODO** a - folderData, p - programId
+		a = fullData[folderId]
+# Loop thru all files in directory, assign p (programId)
 		for p in a['program']:
-			i += 1
-#			if i > 4: sys.exit(1)
+# checkQuit() is function to check if we have 'quit' file.  So user can
+# terminate session AFTER downloading is done, that would be nice way to
+# kill run.
 			checkQuit()
+
+# Generate filename.  Filename is done by using transmission name and then
+# we try look some metadata from description, like original name and year.
 			filename=fixname(a['program'][p]['name'],a['program'][p]['description'])
 
+# Check that if we have match on target already.
+# **TODO** Should we add 'send' date/time on target filename.  After that it
+# would be possible download duplicates of program, if it is from another
+# transmission
 			if os.path.exists(filename+".mp4"):
 				print "DUPE %s: %s.mp4" % (p, filename)
 				file=open("elisa-dl.log", 'a')
@@ -675,63 +673,53 @@ if __name__ == "__main__":
 				file.close()
 				continue
 
+# Verify that we are logged in
 			auth=login()
+# Retrieve download URL for program
 			url=apiUrl+'/recordings/url/'+str(p)+'?platform=ios&'+apiVer
 			getRecordingUrl=requests.get(url, headers=auth)
 			recordingUrl=json.loads(getRecordingUrl.text)
 
 			checkQuit()
-			print "Downloading %s: %s" % (p, filename)
+# Write our status to elisa-dl.log
 			file=open("elisa-dl.log", 'a')
 			file.write("Downloading %s: %s\n" % (p, filename))
 			file.close()
-			if doOnlyFormats == True: time.sleep(1)
+# Verify that target directory does exist
 			nameDir, nameFile = os.path.split(filename)
-			try:
-				os.makedirs(nameDir, 0755)
-			except:
-				pass
-			try:
-				print "Create -formats"
-				if not os.path.exists(filename+"-formats.txt"):
-					cmd='youtube-dl --list-formats \"'+recordingUrl["url"]+'\"'
-					file=open(filename+'-formats.txt', 'w')
-					strFormats=subprocess.check_output(cmd, shell=True)
-					file.write(strFormats)
-					file.close()
-			except:
-				print "Creating FAILED: %s" % filename+'-formats.txt'
-				continue
-			if not doOnlyFormats == False: continue
+			if not os.path.exists(nameDir): os.makedirs(nameDir, 0755)
 
-			print "Create description"
+# Before downloading. create 'filename.txt' that contains 'description' for program.
+# But only if description data exists.
+# **TODO** Poll, Should be configurable on/off?
 			if a['program'][p].has_key('description'):
 				if not os.path.exists(filename+".txt"):
 					file=open(filename+'.txt', 'w')
 					file.write(a['program'][p]['description'].encode('utf8'))
 					file.close()
-			if not os.path.exists(filename+".var"):
+# Retrieve list of possible formats, and save it. This is mainly for debugging purpouses
+# **TODO** Remove/Comment from final release.
+			if not os.path.exists(filename+"-formats.txt"):
+				cmd='youtube-dl --list-formats \"'+recordingUrl["url"]+'\"'
+				file=open(filename+'-formats.txt', 'w')
+				strFormats=subprocess.check_output(cmd, shell=True)
+				file.write(strFormats)
+				file.close()
+# Also we would like to save our 'variable' file, that contains ALL metadata from Elisa.
+# **TODO** You may not want to have this in FINAL release
+			if not os.path.exists(filename+"-var.txt"):
 				save_vars(a['program'][p], filename+'.var')
 			time.sleep(1)
 			checkQuit()
 
-#			try:
-			if 1:
-				if not os.path.exists("%s.mp4" % filename) and not os.path.exists("tmp/%s.mp4" % nameFile):
-					doDownload("tmp/%s" % nameFile, recordingUrl["url"])
-					moveRecord(p, doneDir)
-					os.rename("tmp/%s.mp4" % nameFile, "%s.mp4" % filename)
-#			except:
-#				print "Something bad happened...."
-#				sys.exit(1)
-#				moveRecord(p, failDir)
-			
+# If target file does not exist, continue
+			if not os.path.exists("%s.mp4" % filename) and not os.path.exists("tmp/%s.mp4" % nameFile):
+# Use our own doDownload function to download file
+				doDownload("tmp/%s" % nameFile, recordingUrl["url"])
+# After download, move to 'doneDir'
+				moveRecord(p, doneDir)
+# And rename file from 'tmp' directory to real target directory
+				os.rename("tmp/%s.mp4" % nameFile, "%s.mp4" % filename)
 			checkQuit()
-
-#			sys.exit(1)
-# Quit after first download
-#			break
-# Quit after first directory
-#		break
 
 sys.exit(0)
