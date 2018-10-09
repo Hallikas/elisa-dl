@@ -28,6 +28,8 @@ Kopioi myös c:\Python27\Scripts\youtube-dl.exe samaan hakemistoon kun elisa-dl.
 apt-get -y install ffmpeg python python-pip ; pip install youtube-dl
 
 ... Lisää juttua mitä pitäisi huomioida. Tässä vielä tuo 'release' info:
+
+https://yhteiso.elisa.fi/elisa-viihde-sovellus-ja-nettipalvelu-16/elisa-viihde-api-julkaisut-ja-bugiraportit-512104/index5.html#post588618
 Kiitos @Qotscha tuosta python koodista ... Latasin sen varmaan viikko sitten ja siinä oli ihan hyvää pohjaa omalle jutulle. Siitä se sitten lähtikin.
 
 Eli tarpeena minulla oli saada nuo Viihteen tallenteet omalle koneelle, ja tärkeä osa aikaisemmin ajamaani scriptiä (bash scripti, vanhan APIn aikana) oli tiedostojen uudelleen nimeäminen.
