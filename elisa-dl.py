@@ -492,7 +492,8 @@ def osfilename(fn):
 def doDownload(filename, recordingUrl):
 # Print some debug info
 	print "doDownload(%s, %s)" % (filename, recordingUrl)
-	filename = osfilename(filename)
+# I wish this would work, but no... youtube-dl crashes because utf8 encoding problems
+#	filename = osfilename(filename)
 # Get with ffmpeg, best video and audio, BIG file
 # On Windows system this can cause problems, I have one report about it.
 #	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
@@ -703,7 +704,7 @@ if __name__ == "__main__":
 			file.close()
 # Verify that target directory does exist
 			nameDir, nameFile = os.path.split(filename)
-			if not os.path.exists(nameDir): os.makedirs(nameDir, 0755)
+			if not os.path.exists(osfilename(nameDir)): os.makedirs(osfilename(nameDir), 0755)
 
 # Before downloading. create 'filename.txt' that contains 'description' for program.
 # But only if description data exists.
@@ -729,13 +730,13 @@ if __name__ == "__main__":
 			checkQuit()
 
 # If target file does not exist, continue
-			if not os.path.exists("%s.mp4" % osfilename(filename)) and not os.path.exists("tmp/%s.mp4" % osfilename(nameFile)):
+			if not os.path.exists("%s.mp4" % osfilename(filename)) and not os.path.exists("tmp/%s.mp4" % nameFile):
 # Use our own doDownload function to download file
 				doDownload("tmp/%s" % nameFile, recordingUrl["url"])
 # After download, move to 'doneDir'
 				moveRecord(p, doneDir)
 # And rename file from 'tmp' directory to real target directory
-				os.rename("tmp/%s.mp4" % osfilename(nameFile), "%s.mp4" % osfilename(filename))
+				os.rename("tmp/%s.mp4" % nameFile, "%s.mp4" % osfilename(filename))
 			checkQuit()
 
 sys.exit(0)
