@@ -485,22 +485,33 @@ def login():
 #	print "login()"
 	return {'Authorization': getAccessToken(), 'apikey': apiKey}
 
+def osfilename(fn):
+	return fn.encode(sys.getfilesystemencoding())
+
 # Do download.
 def doDownload(filename, recordingUrl):
 # Print some debug info
 	print "doDownload(%s, %s)" % (filename, recordingUrl)
+# I wish this would work, but no... youtube-dl crashes because utf8 encoding problems
+#	filename = osfilename(filename)
 # Get with ffmpeg, best video and audio, BIG file
 # On Windows system this can cause problems, I have one report about it.
-	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
+#	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
 # Get best of > 720p (HD)
-	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 # Get best of <= 720p, with standard audio (or best)
 #	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?720])+(audio-aacl-192-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 # Well, get ANYTHING less then 1000px (1920x1080) is too big for this ;)
 #	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?999])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# Get best video that is less then 3Mbit/s bitrate. I think that 6Mbit/s it soo much, I can live with 720p
-	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# eac3 audio is not supported by ffmpeg, works just fine, but crashes if audio is eac3
+#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# Audio problems sometimes. Maybe not best choice.
+#	cmd = ( 'youtube-dl --hls-prefer-native -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+
 # Note! last cmd wins.
+
+# Get best video that is less then 3Mbit/s bitrate. I think that 6Mbit/s it soo much, I can live with 720p
+	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 
 	print cmd
 # Write our status to elisa-dl.log
@@ -517,7 +528,9 @@ def doDownload(filename, recordingUrl):
 
 # Get data about all folders.
 def getFolders():
-	if not os.path.exists("var/cache-fData.var"):	
+### DISABLE CACHE
+#	if not os.path.exists("var/cache-fData.var"):
+	if 1:
 		(r, getData) = doApiGet(apiUrl+'/folders'+'?'+apiPlat+'&'+apiVer)
 		if (r["status"] != 200):
 			print "Failed to load folders data",getData.status_code
@@ -533,7 +546,9 @@ def getFolders():
 def getFolder(folderId):
 # Do we have cached data for folder?
 # **TODO** Expire!
-	if not os.path.exists("var/cache-fData-%d.var" % folderId):
+### DISABLE CACHE
+#	if not os.path.exists("var/cache-fData-%d.var" % folderId):
+	if 1:
 # Do API Request, notice EXTRA big pageSize and includeMetadata
 # **TODO** We should sort data somehow... maybe when processing
 		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?'+apiPlat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
@@ -605,7 +620,9 @@ if __name__ == "__main__":
 
 # Check if we have fullData cached
 # **TODO** Expire for cached data.
-	if not os.path.exists("var/cache-fullData.var"):
+### DISABLE CACHE
+#	if not os.path.exists("var/cache-fullData.var"):
+	if 1:
 # Log into Elisa system
 		auth = login()
 # Get data about folders
@@ -666,7 +683,7 @@ if __name__ == "__main__":
 # **TODO** Should we add 'send' date/time on target filename.  After that it
 # would be possible download duplicates of program, if it is from another
 # transmission
-			if os.path.exists(filename+".mp4"):
+			if os.path.exists(osfilename(filename)+".mp4"):
 				print "DUPE %s: %s.mp4" % (p, filename)
 				file=open("elisa-dl.log", 'a')
 				file.write("DUPE %s: %s.mp4\n" % (p, filename))
@@ -687,39 +704,39 @@ if __name__ == "__main__":
 			file.close()
 # Verify that target directory does exist
 			nameDir, nameFile = os.path.split(filename)
-			if not os.path.exists(nameDir): os.makedirs(nameDir, 0755)
+			if not os.path.exists(osfilename(nameDir)): os.makedirs(osfilename(nameDir), 0755)
 
 # Before downloading. create 'filename.txt' that contains 'description' for program.
 # But only if description data exists.
 # **TODO** Poll, Should be configurable on/off?
 			if a['program'][p].has_key('description'):
-				if not os.path.exists(filename+".txt"):
-					file=open(filename+'.txt', 'w')
+				if not os.path.exists(osfilename(filename)+".txt"):
+					file=open(osfilename(filename)+'.txt', 'w')
 					file.write(a['program'][p]['description'].encode('utf8'))
 					file.close()
 # Retrieve list of possible formats, and save it. This is mainly for debugging purpouses
 # **TODO** Remove/Comment from final release.
-			if not os.path.exists(filename+"-formats.txt"):
+			if not os.path.exists(osfilename(filename)+"-formats.txt"):
 				cmd='youtube-dl --list-formats \"'+recordingUrl["url"]+'\"'
-				file=open(filename+'-formats.txt', 'w')
+				file=open(osfilename(filename)+'-formats.txt', 'w')
 				strFormats=subprocess.check_output(cmd, shell=True)
 				file.write(strFormats)
 				file.close()
 # Also we would like to save our 'variable' file, that contains ALL metadata from Elisa.
 # **TODO** You may not want to have this in FINAL release
-			if not os.path.exists(filename+"-var.txt"):
-				save_vars(a['program'][p], filename+'.var')
+			if not os.path.exists(osfilename(filename)+"-var.txt"):
+				save_vars(a['program'][p], osfilename(filename)+'.var')
 			time.sleep(1)
 			checkQuit()
 
 # If target file does not exist, continue
-			if not os.path.exists("%s.mp4" % filename) and not os.path.exists("tmp/%s.mp4" % nameFile):
+			if not os.path.exists("%s.mp4" % osfilename(filename)) and not os.path.exists("tmp/%s.mp4" % nameFile):
 # Use our own doDownload function to download file
 				doDownload("tmp/%s" % nameFile, recordingUrl["url"])
 # After download, move to 'doneDir'
 				moveRecord(p, doneDir)
 # And rename file from 'tmp' directory to real target directory
-				os.rename("tmp/%s.mp4" % nameFile, "%s.mp4" % filename)
+				os.rename("tmp/%s.mp4" % nameFile, "%s.mp4" % osfilename(filename))
 			checkQuit()
 
 sys.exit(0)
