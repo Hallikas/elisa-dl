@@ -489,18 +489,25 @@ def login():
 def doDownload(filename, recordingUrl):
 # Print some debug info
 	print "doDownload(%s, %s)" % (filename, recordingUrl)
+	filename = filename.encode(sys.getfilesystemencoding())
 # Get with ffmpeg, best video and audio, BIG file
 # On Windows system this can cause problems, I have one report about it.
-	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
+#	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
 # Get best of > 720p (HD)
-	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 # Get best of <= 720p, with standard audio (or best)
 #	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?720])+(audio-aacl-192-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 # Well, get ANYTHING less then 1000px (1920x1080) is too big for this ;)
 #	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?999])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# Get best video that is less then 3Mbit/s bitrate. I think that 6Mbit/s it soo much, I can live with 720p
-	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# eac3 audio is not supported by ffmpeg, works just fine, but crashes if audio is eac3
+#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# Audio problems sometimes. Maybe not best choice.
+#	cmd = ( 'youtube-dl --hls-prefer-native -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+
 # Note! last cmd wins.
+
+# Get best video that is less then 3Mbit/s bitrate. I think that 6Mbit/s it soo much, I can live with 720p
+	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
 
 	print cmd
 # Write our status to elisa-dl.log
