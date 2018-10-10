@@ -1,4 +1,12 @@
 # elisa-dl
+
+![GitHub](https://img.shields.io/github/license/Hallikas/elisa-dl.svg)
+![GitHub contributors](https://img.shields.io/github/contributors/Hallikas/elisa-dl.svg)
+![GitHub tag](https://img.shields.io/github/tag/Hallikas/elisa-dl.svg)
+![GitHub last commit](https://img.shields.io/github/last-commit/Hallikas/elisa-dl.svg)
+![GitHub issues](https://img.shields.io/github/issues-raw/Hallikas/elisa-dl.svg)
+
+
 Python downloader script for Elisa-Viihde (New API)
 
 -------------------- ESIVALMISTELUT
