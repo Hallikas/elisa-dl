@@ -731,7 +731,7 @@ if __name__ == "__main__":
 # After download, move to 'doneDir'
 				moveRecord(p, doneDir)
 # And rename file from 'tmp' directory to real target directory
-				os.rename(tmpFile, "%s" % osfilename(filename))
+				os.rename(tmpFile, "%s.mp4" % osfilename(filename))
 			checkQuit()
 
 sys.exit(0)
