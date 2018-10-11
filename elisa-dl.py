@@ -682,17 +682,6 @@ if __name__ == "__main__":
 # we try look some metadata from description, like original name and year.
 			filename=fixname(a['program'][p]['name'],a['program'][p]['description'])
 
-# Check that if we have match on target already.
-# **TODO** Should we add 'send' date/time on target filename.  After that it
-# would be possible download duplicates of program, if it is from another
-# transmission
-			if os.path.exists(osfilename(filename)+".mp4"):
-				print "DUPE %s: %s.mp4" % (p, filename)
-				file=open("elisa-dl.log", 'a')
-				file.write("DUPE %s: %s.mp4\n" % (p, filename))
-				file.close()
-				continue
-
 # Verify that we are logged in
 			auth=login()
 # Retrieve download URL for program
@@ -701,10 +690,6 @@ if __name__ == "__main__":
 			recordingUrl=json.loads(getRecordingUrl.text)
 
 			checkQuit()
-# Write our status to elisa-dl.log
-			file=open("elisa-dl.log", 'a')
-			file.write("Downloading %s: %s.mp4\n" % (p, filename))
-			file.close()
 # Verify that target directory does exist
 			nameDir, nameFile = os.path.split(filename)
 			if not os.path.exists(osfilename(nameDir)): os.makedirs(osfilename(nameDir), 0755)
@@ -718,20 +703,38 @@ if __name__ == "__main__":
 					file.write(a['program'][p]['description'].encode('utf8'))
 					file.close()
 # Also we would like to save our 'variable' file, that contains ALL metadata from Elisa.
-# **TODO** You may not want to have this in FINAL release
+# **TODO** You may not want to have this in FINAL release, but other hands. I think it is nice to have
+# metadata, I just wish I could utilize it... Hmm, maybe Plex has good API to push data in?
 			if not os.path.exists(osfilename(filename)+"-var.txt"):
 				save_vars(a['program'][p], osfilename(filename)+'-var.txt')
 			time.sleep(1)
 			checkQuit()
 
-# If target file does not exist, continue
-			if not os.path.exists("%s.mp4" % osfilename(filename)) and not os.path.exists("tmp/%s.mp4" % nameFile):
+# Check that if we have match on target already.
+# **TODO** Should we add 'send' date/time on target filename.  After that it
+# would be possible download duplicates of program, if it is from another
+# transmission
+			if os.path.exists("%s.mp4" % osfilename(filename)):
+				print "DUPE %s: %s.mp4" % (p, filename)
+				file=open("elisa-dl.log", 'a')
+				file.write("DUPE %s: %s.mp4\n" % (p, filename))
+				file.close()
+				continue
+
+# Write our status to elisa-dl.log
+			file=open("elisa-dl.log", 'a')
+			file.write("Downloading %s: %s.mp4\n" % (p, filename))
+			file.close()
+
+			tmpFile = "tmp/%s.mp4" % nameFile
 # Use our own doDownload function to download file
+			if not os.path.exists(tmpFile):
 				tmpFile = doDownload("%s" % nameFile, recordingUrl["url"])
 # After download, move to 'doneDir'
-				moveRecord(p, doneDir)
+			moveRecord(p, doneDir)
 # And rename file from 'tmp' directory to real target directory
-				os.rename(tmpFile, "%s.mp4" % osfilename(filename))
+			os.rename(tmpFile, "%s.mp4" % osfilename(filename))
+				
 			checkQuit()
 
 sys.exit(0)
