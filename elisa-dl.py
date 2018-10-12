@@ -28,39 +28,44 @@ import json
 import subprocess 
 import glob
 
-# Directory ID to save downloaded files
-# **TODO** - Possibility to use NAME as target. Also CREATE if does not exist.
-doneDir = 0
-
-useCache=False
-forceVars=False	# Write -var.txt and description .txt even of old one exists, Could be problem in case of dupes
-moveDupes=True		# Move record to done directory if file of same name exists
+config = {}
 
 # You should not touch these!
 clientSecret = 'nZhkFGz8Zd8w'
 apiUrl='https://api-viihde-gateway.dc1.elisa.fi/rest/npvr'
 apiPlat='platform=external'
 apiVer='v=2.1&appVersion=1.0'
-apiKey=None
+config['apikey']=None
 
 false=False
 true=True
 
 auth = {}
+fullData = {}
 reqHeaders = {}
 accessCode = {}
 accessToken = {}
 
-infiniteLoop=False
+firstRun=True
 has_match=False
 lookforcheck = 0
-doDirs = None
 disableAPI = False
-sys_os="unix"
+
+config['os']="unix"
+config['donedir']=None
+config['loopsleep']=60
+config['infiniteLoop']=False
+config['moveDupes']=True
+config['usecache']=True
+
 
 # Force utf8 encoding
 reload(sys)
 sys.setdefaultencoding('utf8')
+
+### -----------------------------------------------------------------------
+### Filename parser
+### -----------------------------------------------------------------------
 
 def lookfor(istype, whatstr, fromstr):
 	global lookforcheck
@@ -78,7 +83,6 @@ def lookfor(istype, whatstr, fromstr):
 		has_match = True
 	return fromstr
 
-#
 #
 # This part is probably most interesting, it takes TITLE and DESCRIPTION of program.
 # Then it tries to make 'clever' filenames just by comparing information it can get.
@@ -283,6 +287,18 @@ def fixname(t, d):
 
 	return filename
 
+### -----------------------------------------------------------------------
+### Support functions
+### -----------------------------------------------------------------------
+
+def lookYesNo(test):
+	if test in ['false','off','no']: return False
+	if test in ['true','on','yes']: return True
+	return None
+
+def osfilename(fn):
+	return fn.encode(sys.getfilesystemencoding())
+
 ## Save python variable to file
 def save_vars(var, fname, id=None):
 	fp = open(fname, "w+b")
@@ -383,15 +399,11 @@ def show_vars(var, lvl=0):
 	else:
 		st += "\'%s\'" % re.sub("\'", "\\\'", str(var))
 	return st
-###
-##
-def lookYesNo(test):
-	if test in ['false','off','no']: return False
-	if test in ['true','on','yes']: return True
-	return None
 
-##
-## API Functions
+### -----------------------------------------------------------------------
+### Functions related to API communication
+### -----------------------------------------------------------------------
+
 def doApiProcess(ret = None):
 
 	r={}
@@ -412,7 +424,6 @@ def doApiProcess(ret = None):
 		r['headers']['X-RateLimit-Remaining-second'] = ret.headers['X-RateLimit-Remaining-second']
 		r['headers']['X-RateLimit-Limit-minute'] = ret.headers['X-RateLimit-Limit-minute']
 		r['headers']['X-RateLimit-Remaining-minute'] = ret.headers['X-RateLimit-Remaining-minute']
-
 
 # Print ratelimit information, for debug purpouses when doing multiple requests
 #	print "RateLimit:",
@@ -441,13 +452,14 @@ def doApiProcess(ret = None):
 
 # API POST function
 def doApiPost(url, data=false):
+# **TODO** Check if used in config
 	if disableAPI:
 		print "_doApiProcess()"
-		return
+		return (None, None)
 	if auth:
 		reqHeaders = auth
 	else:
-		reqHeaders = {'content-type': 'application/x-www-form-urlencoded', 'apikey': apiKey}
+		reqHeaders = {'content-type': 'application/x-www-form-urlencoded', 'apikey': config['apikey']}
 
 	if data:
 		ret = requests.post(url, data=data, headers=reqHeaders)
@@ -461,7 +473,7 @@ def doApiPost(url, data=false):
 def doApiGet(url, data=false):
 	if disableAPI:
 		print "_doApiProcess()"
-		return
+		return (None, None)
 	if not auth:
 		print "Missing Authentication"
 		sys.exit(1)
@@ -471,11 +483,15 @@ def doApiGet(url, data=false):
  	s = json.loads(ret.text)
  	return (r,s)
 
+### -----------------------------------------------------------------------
+### Login related functions
+### -----------------------------------------------------------------------
+
 # Get access code for access token
 def getAccessCode():
 	ret = requests.post('https://api-viihde-gateway.dc1.elisa.fi/auth/authorize/access-code',
 		json = {'client_id': 'external', 'client_secret': clientSecret, 'response_type': 'code', 'scopes': []},
-		headers = {'content-type': 'application/json', 'apikey': apiKey})
+		headers = {'content-type': 'application/json', 'apikey': config['apikey']})
  	return json.loads(ret.text)['code']
 
 # This is something that you don't have to do very often. API documentation says that token is just fine for 30 days :)
@@ -507,19 +523,100 @@ def getAccessToken():
  	 	save_vars(token, "var/access.var")
 	return "%s %s" % (token['token_type'], token['access_token'])
 
+
 # login function should return headers to do authorization
 def login():
 #	print "login()"
-	return {'Authorization': getAccessToken(), 'apikey': apiKey}
+	return {'Authorization': getAccessToken(), 'apikey': config['apikey']}
 
-def osfilename(fn):
-	return fn.encode(sys.getfilesystemencoding())
+### -----------------------------------------------------------------------
+### Tools
+### -----------------------------------------------------------------------
+def testVar(varFile = None):
+	if not varFile:
+		print "You must give -var file as parameter"
+		sys.exit(1)
+	try:
+		varData=load_vars(varFile)
+	except:
+		print "%s is not var-file or it is broken" % varFile
+		sys.exit(1)
 
-# Do download.
-def doDownload(filename, recordingUrl):
+	print "Channel:",varData["channelName"]
+	print "Type:",varData["showType"]
+	print "Start:",varData["startTime"]
+	print
+	print "Title:",varData['name']
+	print "Description:"
+	print varData['description']
+	print
+	print fixname(varData['name'], varData['description'])
+	return
+
+def loadConfig():
+	global config
+
+	if sys.platform == 'win32':
+		config['os']="win"
+
+	if not os.path.exists("elisa-dl.conf"):
+		print "You should copy elisa-dl.sample.conf to elisa-dl.conf"
+		print "And edit it to contain your Elisa-Viihde username and password"
+		print "Also you need to provide apikey"
+		print
+		sys.exit(1)
+	fp = open("elisa-dl.conf", 'r')
+	line = ""
+	while 1:
+		line = fp.readline()
+		if not line: break
+		if len(line) <= 1 or line[1:] == "#": continue
+
+		a=re.search('^username\s*=\s*(?P<user>[\w\d]+)',line,re.IGNORECASE)
+		if a: config['username']=a.groupdict()['user']
+		a=re.search('^password\s*=\s*(?P<pass>[\w\d]+)',line,re.IGNORECASE)
+		if a: config['password']=a.groupdict()['pass']
+		a=re.search('^apikey\s*=\s*(?P<apikey>[\w\d]+)',line,re.IGNORECASE)
+		if a: config['apikey']=a.groupdict()['apikey']
+
+		a=re.search('^donedir\s*=\s*(?P<donedir>[\d]+)',line,re.IGNORECASE)
+		if a:
+			config['donedir']=int(a.groupdict()['donedir'])
+		a=re.search('^dodirs\s*=\s*(?P<dodirs>[\d]+)',line,re.IGNORECASE)
+		if a:
+			config['doDirs']=[ int(a.groupdict()['dodirs']) ]
+		a=re.search('^cache\s*=\s*(?P<usecache>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			config['usecache']=lookYesNo(a.groupdict()['usecache'])
+
+		a=re.search('^move-dupes\s*=\s*(?P<movedupes>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			config['moveDupes']=lookYesNo(a.groupdict()['movedupes'])
+
+		a=re.search('^infinite-loop\s*=\s*(?P<infiniteloop>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			config['infiniteLoop']=lookYesNo(a.groupdict()['infiniteloop'])
+	fp.close()
+
+	return config
+
+### -----------------------------------------------------------------------
+### Tools
+### -----------------------------------------------------------------------
+# Check if we have quit conditions, for nice end of the program.
+def checkQuit():
+	if os.path.exists("/quit") or os.path.exists("quit"):
+		print "Quit requested"
+		
+		return True
+	return None
+
+### -----------------------------------------------------------------------
+### doDownload
+### -----------------------------------------------------------------------
+def doDownload(filename, recordingUrl, programId):
 # I wish this would work, but no... youtube-dl crashes because utf8 encoding problems
 #	filename = osfilename(filename)
-	filename = "tmp/%s" % (filename)
 
 	# If you need to debug formats
 	if not os.path.exists(osfilename(filename)+"-formats.txt"):
@@ -557,315 +654,64 @@ def doDownload(filename, recordingUrl):
 # This OVERIDES everything above!
 #	cmd = 'ffmpeg -i \"%s\" -c copy \"%s.mp4\"' % (recordingUrl, filename)
 
+# Just my own debug interrupt
+	if os.path.exists("no-download"):
+		print "NOT Downloading %s: %s" % (programId, filename)
+		return None
+# Execute downloading
+	print "Downloading %s: %s" % (programId, filename)
+
 # Write our status to elisa-dl.log
+	file=open("elisa-dl.log", 'a')
+	file.write("Downloading %s: %s.mp4\n" % (programId, filename))
+	file.close()
+
+# Write our status to elisa-dl-cmd.log
 	file=open("elisa-dl-cmd.log", 'w')
 	file.write("%s\n" % cmd)
 	file.close()
-# Just my own debug interrupt
-	if os.path.exists("no-download"):
-		sys.exit(0)
-# Execute downloading
 	os.system(cmd)
 
 	return "%s.mp4" % (filename)
 
-# Get data about all folders.
-def getFolders():
-	if not useCache or not os.path.exists("var/cache-fData.var"):
-		(r, getData) = doApiGet(apiUrl+'/folders'+'?'+apiPlat+'&'+apiVer)
-		if (r["status"] != 200):
-			print "Failed to load folders data",getData.status_code
-			sys.exit(1)
-
-		fData = {getData["id"]: {"name": getData["name"], "count": getData["recordingsCount"]}}
-		for f in getData["folders"]:
-			fData[f["id"]] = {"name": f["name"], "count": f["recordingsCount"]}
-		save_vars(fData, "var/cache-fData.var")
-	fData=load_vars("var/cache-fData.var")
-	return fData
-
-def getFolder(folderId):
-# Do we have cached data for folder?
-# **TODO** Expire!
-	if not useCache or not os.path.exists("var/cache-fData-%d.var" % folderId):
-# Do API Request, notice EXTRA big pageSize and includeMetadata
-# **TODO** We should sort data somehow... maybe when processing
-		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?'+apiPlat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
-# We don't have error handling. If status is NOT 200, just report error and quit
-		if (r["status"] != 200):
-			print "Failed to load recording data for folder %d" % (folderId), r["status"]
-			sys.exit(1)
-		rData = {}
-# full data about single program lies in getData["recordings"][programId["programId"])
-		for r in getData["recordings"]:
-# **TODO** I don't get that code below, is it stupid?  I think that r =
-# programId.  But why we set it back to r?..  I must rethink this.
-			rData[r["programId"]] = r
-# Save cached data
-		save_vars(rData, "var/cache-rData-%d.var" % folderId)
-# Load cached data to variable and return from function
-	rData=load_vars("var/cache-rData-%d.var" % folderId)
-	return rData
-
 # Move programId to another folderId
-def moveRecord(programId, folderId=doneDir):
+def moveRecord(programId, folderId=config['donedir']):
 	if not auth:
 		print "Missing Authentication"
 		sys.exit(1)
 
 	headers = auth
 	headers['content-type'] = 'application/x-www-form-urlencoded'
-#	try:
-	ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (programId, folderId), headers=headers)
+	ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (int(programId), int(folderId)), headers=headers)
 	r = doApiProcess(ret)
-#	except:
 # **TODO** We don't have exception handling, YET.. What to do if moving to doneDir fails?
-#	pass
 	return
 
-#
-# Check if we have quit conditions, for nice end of the program.
-def checkQuit():
-	if os.path.exists("/quit") or os.path.exists("quit"):
-		print "Quit requested"
-		return True
-	return None
-
-def loadConfig():
-	global username, password, apiKey, doneDir, doDirs, useCache, moveDupes, infiniteLoop
-	if not os.path.exists("elisa-dl.conf"):
-		print "You should copy elisa-dl.sample.conf to elisa-dl.conf"
-		print "And edit it to contain your Elisa-Viihde username and password"
-		print "Also you need to provide apikey"
-		print
-		sys.exit(1)
-	fp = open("elisa-dl.conf", 'r')
-	line = ""
-	while 1:
-		line = fp.readline()
-		if not line: break
-		if len(line) <= 1 or line[1:] == "#": continue
-
-		a=re.search('^username\s*=\s*(?P<user>[\w\d]+)',line,re.IGNORECASE)
-		if a: username=a.groupdict()['user']
-		a=re.search('^password\s*=\s*(?P<pass>[\w\d]+)',line,re.IGNORECASE)
-		if a: password=a.groupdict()['pass']
-		a=re.search('^apikey\s*=\s*(?P<apikey>[\w\d]+)',line,re.IGNORECASE)
-		if a: apiKey=a.groupdict()['apikey']
-
-		a=re.search('^donedir\s*=\s*(?P<donedir>[\d]+)',line,re.IGNORECASE)
-		if a:
-			doneDir=int(a.groupdict()['donedir'])
-		a=re.search('^dodirs\s*=\s*(?P<dodirs>[\d]+)',line,re.IGNORECASE)
-		if a:
-			doDirs=[ int(a.groupdict()['dodirs']) ]
-		a=re.search('^cache\s*=\s*(?P<usecache>[\w\d]+)',line,re.IGNORECASE)
-		if a:
-			useCache=a.groupdict()['usecache']
-			useCache=lookYesNo(useCache)
-
-		a=re.search('^move-dupes\s*=\s*(?P<movedupes>[\w\d]+)',line,re.IGNORECASE)
-		if a:
-			moveDupes=a.groupdict()['movedupes']
-			moveDupes=lookYesNo(moveDupes)
-
-		a=re.search('^infinite-loop\s*=\s*(?P<infiniteloop>[\w\d]+)',line,re.IGNORECASE)
-		if a:
-			infiniteLoop=a.groupdict()['infiniteloop']
-			infiniteLoop=lookYesNo(infiniteLoop)
-	fp.close()
-
-	if sys.platform == 'win32':
-		sys_os="win"
-	return
-
-#
-# Main Magic
+### -----------------------------------------------------------------------
+### Main download loop
+### -----------------------------------------------------------------------
 def main():
-	global clientSecret, apiUrl, apiPlat, apiVer
-	global auth, accessCode, accessToken, reqHeaders
-	global username, password, apiKey, doneDir, doDirs, useCache, moveDupes, infiniteLoop
-	global lookforcheck, disableAPI, has_match
-	global false, true, sys_os
+	global auth, fullData
 
-	global doneDir, useCache, forceVars, moveDupes
+	if len(auth) == 0: auth = login()
 
-	firstRun = True
-	while firstRun or infiniteLoop:
-#NOQuit#	if checkQuit(): break # /InfiniteLoop
-		firstRun = False
-		loadConfig()
+	if not fullData.has_key('program'): fullData=cacheFullData()
+	for folderId in fullData['folder']:
+		if config.has_key('doDirs') and folderId not in config['doDirs']: continue
+# Don't process doneDir
+		if folderId in [config['donedir']]: continue
+		print "Processing folder '%s' (%d)" % (fullData['folder'][folderId]['name'], folderId)
+		if fullData['folder'][folderId]['count'] < 1: continue
 
-# Make cache directory
-		if not os.path.exists('var'): os.makedirs('var', 0755)
-# Make temp download directory
-		if not os.path.exists('tmp'): os.makedirs('tmp', 0755)
-##
-## Login
-		if len(auth) == 0: auth = login()
+		for programId in fullData['folder'][folderId]['programs']:
+			getProgram(programId)
+			if checkQuit(): return
+		if checkQuit(): return
+	return
 
-# Check if we have fullData cached
-# **TODO** Expire for cached data.
-		if not useCache or not os.path.exists("var/cache-fullData.var"):
-# Get data about folders
-			fData = getFolders()
-# Set fullData base structre from folder data
-			fullData = fData
-# Loop thru folders
-			for f in fData:
-# Show folder ID and Name, mainly for debugging
-				print "Reading directory %d: %s" % (f, fData[f]["name"])
-# Read data about PROGRAM from folder
-				rData = getFolder(f)
-				if len(rData) == 0: continue
-# Create entry for program in fullData
-				fullData[f]["program"] = rData
-				for r in rData:
-					r=rData[r]
-# Save cached data to disk
-			save_vars(fullData, "var/cache-fullData.var")
-# Load cached data.  We could skip this (if cache is created), but I want to
-# keep this so we can detect problems. With cache handling.
-		fullData = load_vars("var/cache-fullData.var")
-## **TODO** Verify cache
-## - If we poll folders and notify if program count changes?
-## - Load directory information (fData) from Elisa
-## - Reload directory data if does not match
-
-##
-## Login and download
-		if len(auth) == 0: auth = login()
-# Loop thru full data (cached), by folders
-		for a in fullData:
-#NoQuit#		if checkQuit(): break # /InfiniteLoop
-			folderId=a
-# **TODO** My own debug - Do ONLY THESE
-			if doDirs and folderId not in doDirs: continue
-			print "Processing folder '%s' (%d)" % (fullData[folderId]['name'], folderId)
-# Loop if we don't have program entries.
-			if fullData[folderId]['count'] < 1: continue
-# Skip doneDir
-			if folderId in [doneDir]: continue
-#
-
-# For now, a-variable contains id of entry on fullData. But we like to hand
-# as it would be data of fullData[a]. So we assign it.
-# **TODO** a - folderData, p - programId
-			a = fullData[folderId]
-# Loop thru all files in directory, assign p (programId)
-			for p in a['program']:
-# checkQuit() is function to check if we have 'quit' file.  So user can
-# terminate session AFTER downloading is done, that would be nice way to
-# kill run.
-				if checkQuit(): break # /InfiniteLoop
-
-# Generate filename.  Filename is done by using transmission name and then
-# we try look some metadata from description, like original name and year.
-				filename=fixname(a['program'][p]['name'],a['program'][p]['description'])
-
-# Verify that target directory does exist
-				nameDir, nameFile = os.path.split(filename)
-				if not os.path.exists(osfilename(nameDir)): os.makedirs(osfilename(nameDir), 0755)
-
-# We would like to save our 'variable' file, that contains ALL metadata from Elisa.
-# **TODO** You may not want to have this in FINAL release, but other hands. I think it is nice to have
-# metadata, I just wish I could utilize it... Hmm, maybe Plex has good API to push data in?
-				if forceVars or not os.path.exists(osfilename(filename)+"-var.txt"):
-					save_vars(a['program'][p], osfilename(filename)+'-var.txt')
-
-# Before downloading. create 'filename.txt' that contains 'description' for program.
-# But only if description data exists.
-# **TODO** Poll, Should be configurable on/off?
-				if a['program'][p].has_key('description'):
-					if forceVars or not os.path.exists(osfilename(filename)+".txt"):
-						file=open(osfilename(filename)+'.txt', 'w')
-						file.write(a['program'][p]['description'].encode('utf8'))
-						file.close()
-				if checkQuit(): break # /InfiniteLoop
-
-# Check that if we have match on target already.
-# **TODO** Should we add 'send' date/time on target filename.  After that it
-# would be possible download duplicates of program, if it is from another
-# transmission
-				if os.path.exists("%s.mp4" % osfilename(filename)):
-					print "DUPE %s: %s.mp4" % (p, filename)
-					file=open("elisa-dl.log", 'a')
-					file.write("DUPE %s: %s.mp4\n" % (p, filename))
-					file.close()
-					if moveDupes:
-						moveRecord(p, doneDir)
-					continue
-
-# Write our status to elisa-dl.log
-
-				tmpFile = "tmp/%s.mp4" % nameFile
-# Use our own doDownload function to download file
-				if not os.path.exists(tmpFile):
-# Verify that we are logged in
-					auth=login()
-# Retrieve download URL for program
-					url=apiUrl+'/recordings/url/'+str(p)+'?platform=ios&'+apiVer
-					getRecordingUrl=requests.get(url, headers=auth)
-					recordingUrl=json.loads(getRecordingUrl.text)
-
-					print "Downloading %s: %s" % (p, filename)
-					file=open("elisa-dl.log", 'a')
-					file.write("Downloading %s: %s.mp4\n" % (p, filename))
-					file.close()
-					tmpFile = doDownload("%s" % nameFile, recordingUrl["url"])
-# I hope that this helps to interrupt that record is not moved to Done directory in case of CTRL-C quit
-					time.sleep(2)
-				else:
-					print "Found program from temp %s: %s" % (p, filename)
-					file=open("elisa-dl.log", 'a')
-					file.write("Move from temp %s: %s.mp4\n" % (p, filename))
-					file.close()
-				
-# After download, move to 'doneDir'
-				moveRecord(p, doneDir)
-# And rename file from 'tmp' directory to real target directory
-				toDir, toFName = os.path.split(osfilename(filename))
-				try:
-					if not os.path.exists(toDir):
-						os.makedirs(toDir, 0755)
-				except IOError as err:
-					print "%s: %s" % (err.strerror, doDir)
-					sys.exit(1)
-				os.rename(tmpFile, "%s.mp4" % osfilename(filename))
-					
-				if checkQuit(): break # /InfiniteLoop
-			if checkQuit(): break # /InfiniteLoop
-		if checkQuit(): break # /InfiniteLoop
-		if infiniteLoop:
-			print "Sleeping for 60 seconds in infiniteLoop until checking Elisa-Viihde again."
-			time.sleep(60)
-	# /infiniteLoop	
-
-
-
-def testVar(varFile = None):
-	## **TODO** / Work in progress
-	# Filename Test, give -var file as parameter:
-	if not varFile:
-		print "You must give -var file as parameter"
-		sys.exit(1)
-	try:
-		varData=load_vars(varFile)
-	except:
-		print "%s is not var-file or it is broken" % varFile
-		sys.exit(1)
-
-	print "Channel:",varData["channelName"]
-	print "Type:",varData["showType"]
-	print "Start:",varData["startTime"]
-	print
-	print "Title:",varData['name']
-	print "Description:"
-	print varData['description']
-	print
-	print fixname(varData['name'], varData['description'])
-	sys.exit(0)
-
+### -----------------------------------------------------------------------
+### Func: fileRename
+### -----------------------------------------------------------------------
 def fileRename(doFile = None):
 	if not doFile:
 		print "You must give file as parameter"
@@ -891,7 +737,7 @@ def fileRename(doFile = None):
 		print "FATAL: More then 6 files matches with %s. Too dangerous, please verify." % doFile
 		sys.exit(1)
 
-	FixName = doFile
+	FixName=doFile
 	FixName=re.sub('\(','\(',FixName)
 	FixName=re.sub('\)','\)',FixName)
 	FixName=re.sub('\[','\[',FixName)
@@ -922,54 +768,230 @@ def fileRename(doFile = None):
 			continue
 	return
 
+
+
+
+
+
+
+
+
+
+
+
+### -----------------------------------------------------------------------
+###
+### -----------------------------------------------------------------------
+
 def findProgram(doFile = None):
-	if not doFile:
-		print "You must give file as parameter"
-		sys.exit(1)
-
-	nameDir, nameFile = os.path.split(doFile)
-	nameFile = re.sub('(-formats|-var)?.(txt|mp4|var)$', '', nameFile)
-
-	fullData = load_vars("var/cache-fullData.var")
-	isFound = None
-	for folderId in fullData:
-		for programId in fullData[folderId]['program']:
-#			if programId not in [12051853]: continue
-			prog = fullData[folderId]['program'][programId]
-			oldName="%s (%s)" % (re.sub('^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',prog['name']), re.sub(r'(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d','\g<1>\g<2>\g<3>_\g<4>\g<5>',prog['startTime']))
-			newDir, newName=os.path.split(fixname(prog['name'],prog['description']))
-
-#			print "Old",oldName
-#			print "Find",nameFile
-#			print "New",newName
-#			print
-
-			if nameFile == oldName or  nameFile == newName:
-				if nameDir:
-					save_vars(prog, nameDir+"/"+osfilename(nameFile)+'-var.txt')
-				isFound = True
-			if isFound: break
-		if isFound: break
-	if isFound: fileRename(nameDir+"/"+osfilename(nameFile)+'-var.txt')
-	if not isFound:
-		print "Can't find information about", nameFile
+### **TODO** REWORK THIS
+#	if not doFile:
+#		print "You must give file as parameter"
+#		sys.exit(1)
+#
+#	nameDir, nameFile = os.path.split(doFile)
+#	nameFile = re.sub('(-formats|-var)?.(txt|mp4|var)$', '', nameFile)
+#
+#	fullData = load_vars("var/cache-fullData.var")
+#	isFound = None
+#	if 1:
+#		if 1:
+##			if programId not in [12051853]: continue
+#			prog = fullData[folderId]['program'][programId]
+#			oldName="%s (%s)" % (re.sub('^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',prog['name']), re.sub(r'(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d','\g<1>\g<2>\g<3>_\g<4>\g<5>',prog['startTime']))
+#			newDir, newName=os.path.split(fixname(prog['name'],prog['description']))
+#
+##			print "Old",oldName
+##			print "Find",nameFile
+##			print "New",newName
+##			print
+#
+#			if nameFile == oldName or  nameFile == newName:
+#				if nameDir:
+#					save_vars(prog, nameDir+"/"+osfilename(nameFile)+'-var.txt')
+#				isFound = True
+##			if isFound: break
+##		if isFound: break
+#	if isFound: fileRename(nameDir+"/"+osfilename(nameFile)+'-var.txt')
+#	if not isFound:
+#		print "Can't find information about", nameFile
 	return
 
-###
-### MAIN CODE STARTS FROM HERE!
-###
+
+
+
+
+
+
+
+
+
+
+### -----------------------------------------------------------------------
+### Func: getProgram
+### -----------------------------------------------------------------------
+def getProgram(programId):
+#	if checkQuit(): return # /InfiniteLoop
+	program = fullData['program'][int(programId)]
+
+	for folderId in fullData['folder']:
+		if not fullData['folder'][folderId].has_key('programs'): continue
+		if fullData['folder'][folderId]['programs'].has_key(int(programId)):
+			program=fullData['folder'][folderId]['programs'][int(programId)]
+			break
+			
+	oldName="%s (%s)" % (re.sub('^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',program['name']), re.sub(r'(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d','\g<1>\g<2>\g<3>_\g<4>\g<5>',program['startTime']))
+	filename = fixname(program['name'],program['description'])
+	fileDir, fileName=os.path.split(filename)
+
+# Verify that target directory does exist
+	if not os.path.exists(osfilename(fileDir)): os.makedirs(osfilename(fileDir), 0755)
+
+	if os.path.exists("%s.mp4" % osfilename(filename)):
+		print "DUPE %s: %s.mp4" % (programId, filename)
+		file=open("elisa-dl.log", 'a')
+		file.write("DUPE %s: %s.mp4\n" % (programId, filename))
+		file.close()
+		if config['moveDupes'] and config['donedir']:
+			moveRecord(programId, config['donedir'])
+	else:
+		tmpFile = osfilename("tmp/%s" % fileName)
+
+		save_vars(program, tmpFile+"-var.txt")
+		file=open(tmpFile+'.txt', 'w')
+		file.write(program['description'].encode('utf8'))
+		file.close()
+
+		if not os.path.exists("%s.mp4" % tmpFile):
+# Verify that we are logged in
+			auth=login()
+# Retrieve download URL for program
+			url=apiUrl+'/recordings/url/'+str(programId)+'?platform=ios&'+apiVer
+			getRecordingUrl=requests.get(url, headers=auth)
+			recordingUrl=json.loads(getRecordingUrl.text)
+
+			tmpFile = doDownload("%s" % tmpFile, recordingUrl["url"], programId)
+# I hope that this helps to interrupt that record is not moved to Done directory in case of CTRL-C quit
+			time.sleep(1)
+		else:
+			print "Found program from temp %s: %s" % (programId, filename)
+			file=open("elisa-dl.log", 'a')
+			file.write("Move from temp %s: %s.mp4\n" % (programId, filename))
+			file.close()
+
+		if tmpFile:
+			time.sleep(1)
+			if config['donedir']:
+				moveRecord(programId, config['donedir'])
+			fileRename("%s.mp4" % tmpFile)
+	return
+
+
+### -----------------------------------------------------------------------
+### Cache/Get Data
+### -----------------------------------------------------------------------
+def cacheProgramData(folderId):
+	global apiUrl, apiPlat, apiVer
+#	if not config['usecache'] or
+	if not os.path.exists("var/cache-fData-%d.var" % folderId):
+		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?'+apiPlat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
+		if (r["status"] != 200):
+			print "Failed to load recording data for folder %d" % (folderId), r["status"]
+			sys.exit(1)
+		rData = {}
+		for rGetData in getData["recordings"]:
+			rData[rGetData["programId"]] = rGetData
+		save_vars(rData, "var/cache-rData-%d.var" % folderId)
+	varData=load_vars("var/cache-rData-%d.var" % folderId)
+	return varData
+
+def cacheFolderData():
+	global apiUrl, apiPlat, apiVer
+#	if not config['usecache'] or 
+	if not os.path.exists("var/cache-fData.var"):
+		(r, getData) = doApiGet(apiUrl+'/folders'+'?'+apiPlat+'&'+apiVer)
+		if (r["status"] != 200):
+			print "Failed to load folders data",getData.status_code
+			sys.exit(1)
+		fData = {getData["id"]: {"name": getData["name"], "count": getData["recordingsCount"]}}
+		for f in getData["folders"]:
+			fData[f["id"]] = {"name": f["name"], "count": f["recordingsCount"]}
+		save_vars(fData, "var/cache-fData.var")
+	varData=load_vars("var/cache-fData.var")
+	return varData
+
+def cacheFullData():
+	global fullData
+
+#	if not config['usecache'] or 
+	if not os.path.exists("var/cache-fullData.var"):
+		fullData['folder'] = cacheFolderData()
+		fullData['program'] = {}
+		for folderId in fullData['folder']:
+			if folderId == 'program': continue
+			print "Reading directory %d: %s" % (folderId, fullData['folder'][folderId]['name'])
+			if fullData['folder'][folderId]['count'] < 1: continue
+			rData = cacheProgramData(folderId)
+			if len(rData) == 0: continue
+			fullData['folder'][folderId]['programs'] = rData
+			for r in rData:
+				fullData['program'][r] = rData[r]
+		save_vars(fullData, "var/cache-fullData.var")
+	varData = load_vars("var/cache-fullData.var")
+	return varData
+
+### -----------------------------------------------------------------------
+### Startup
+### -----------------------------------------------------------------------
 if __name__ == "__main__":
+	loadConfig()
+# Make cache and temp directories if does not exist
+	if not os.path.exists('var'): os.makedirs('var', 0755)
+	if not os.path.exists('tmp'): os.makedirs('tmp', 0755)
+
+# Show metadata from var- file
 	if not sys.argv[1:]:
-		print main()
-	elif sys.argv[1:][0] == "lookup" or sys.argv[1:][0] == "find":
-		if len(sys.argv) >= 3:
-			for i, fn in enumerate(sys.argv[2:]):
-				findProgram(fn)
+		pass
 	elif sys.argv[1:][0] == "filename" or sys.argv[1:][0] == "test":
 		if len(sys.argv) >= 3:
 			testVar(sys.argv[2:][0])
+# Rename files by data from var- file
 	elif sys.argv[1:][0] == "rename":
 		if len(sys.argv) >= 3:
 			for i, fn in enumerate(sys.argv[2:]):
 				fileRename(fn)
+
+# All other needs data from server/cache
+	auth=login()
+	fullData = cacheFullData()
+
+# Without argument, download all
+	if not sys.argv[1:]:
+		while firstRun or config['infiniteLoop']:
+			firstRun = False
+			main()
+			
+			if not config['infiniteLoop']: break
+			print "Sleeping for %d sec until new loop" % config["loopsleep"]
+			i=0
+			while i < config["loopsleep"]:
+				i=i+1
+				if checkQuit():
+					config['infiniteLoop'] = False
+					break
+				time.sleep(1)
+
+# Download by programId
+	elif sys.argv[1:][0] == "get":
+		if len(sys.argv) >= 3:
+			for p in sys.argv[2:]:
+				for programId in p.split(","):
+					if programId:
+						getProgram(programId)
+# Look from fullData.var by filename
+	elif sys.argv[1:][0] == "lookup" or sys.argv[1:][0] == "find":
+		if len(sys.argv) >= 3:
+			for i, fn in enumerate(sys.argv[2:]):
+				findProgram(fn)
+
 sys.exit(0)
