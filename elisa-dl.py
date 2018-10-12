@@ -934,6 +934,7 @@ def findProgram(doFile = None):
 	fullData = load_vars("var/cache-fullData.var")
 	isFound = None
 	for folderId in fullData:
+		if not fullData[folderId].has_key('program'): continue
 		for programId in fullData[folderId]['program']:
 #			if programId not in [12051853]: continue
 			prog = fullData[folderId]['program'][programId]
