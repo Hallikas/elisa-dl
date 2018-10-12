@@ -692,7 +692,7 @@ def main():
 
 	firstRun = True
 	while firstRun or infiniteLoop:
-		if checkQuit(): break # /InfiniteLoop
+#NOQuit#	if checkQuit(): break # /InfiniteLoop
 		firstRun = False
 		loadConfig()
 
@@ -734,11 +734,10 @@ def main():
 
 ##
 ## Login and download
-		print "Here"
 		if len(auth) == 0: auth = login()
 # Loop thru full data (cached), by folders
 		for a in fullData:
-			if checkQuit(): break # /InfiniteLoop
+#NoQuit#		if checkQuit(): break # /InfiniteLoop
 			folderId=a
 # **TODO** My own debug - Do ONLY THESE
 			if doDirs and folderId not in doDirs: continue
@@ -934,7 +933,6 @@ def findProgram(doFile = None):
 	fullData = load_vars("var/cache-fullData.var")
 	isFound = None
 	for folderId in fullData:
-		if not fullData[folderId].has_key('program'): continue
 		for programId in fullData[folderId]['program']:
 #			if programId not in [12051853]: continue
 			prog = fullData[folderId]['program'][programId]
