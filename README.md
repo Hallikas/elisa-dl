@@ -1,27 +1,63 @@
-# elisa-dl
+# Python downloader script for Elisa-Viihde (New API)
+
+[![Waffle.io - Columns and their card count](https://badge.waffle.io/Hallikas/elisa-dl.svg?columns=all)](https://waffle.io/Hallikas/elisa-dl)
 
 ![GitHub](https://img.shields.io/github/license/Hallikas/elisa-dl.svg)
 ![GitHub contributors](https://img.shields.io/github/contributors/Hallikas/elisa-dl.svg)
 ![GitHub tag](https://img.shields.io/github/tag/Hallikas/elisa-dl.svg)
 ![GitHub last commit](https://img.shields.io/github/last-commit/Hallikas/elisa-dl.svg)
-![GitHub issues](https://img.shields.io/github/issues-raw/Hallikas/elisa-dl.svg)
-
-[![Waffle.io - Columns and their card count](https://badge.waffle.io/Hallikas/elisa-dl.svg?columns=all)](https://waffle.io/Hallikas/elisa-dl)
 
 
-Python downloader script for Elisa-Viihde (New API)
+/* ************************************************************************
+This README is not done!  This works as notepad for now, but I will
+focus on this later.  I try keep development language in english, but
+because this software is mainly for Finnish people, using Finnish is just
+fine too.
+************************************************************************ */
 
-/* ****
 
-This README is not done! This works as notepad for now, but I will focus on
-this later. I try keep development language in english, but because this
-software is mainly for Finnish people, using Finnish is just fine too.
+Command line parameters:
+elisa-dl.py find filename.mp4 - Tries to find programId by filename, writes -var.txt file for file and renames. (use in case of missing -var)
+Example:
 
-**** */
+elisa-dl.py rename file-var.txt - Renames file* files. Uses -var file to get data for generating filename.
+Example:
+	(after fixing: "name": 'Simpsonit 29. kausi (7)' -> "name": 'Simpsonit (7)' from -var file)
+	$ ./elisa-dl.py rename series/Simpsonit\ 29.\ kausi/Simpsonit\ 29.\ kausi\ -\ S29E14\ -\ Pellen\ pahin\ pelko-var.txt
+	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko-formats.txt' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko-formats.txt'
+	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko-var.txt' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko-var.txt'
+	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko-var.txt~' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko-var.txt~'
+	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko.mp4' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko.mp4'
+	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko.txt' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko.txt'
 
+elisa-dl.py filename test-var.txt - Shows metadata from -var file, also shows what filename would be in case of rename.
+Example:
+	$ ./elisa-dl.py filename movie/007\ Skyfall\ \(2012\)-var.txt
+	Channel: Nelonen
+	Type: MOVIE
+	Start: 2018-09-08 21:00:00
+
+	Title: 007 Skyfall (12)
+	Description:
+
+	(007 Skyfall/UK-USA 2012). Kaikkien aikojen menestyneimmässä
+        Bond-seikkailussa 007:n lojaalius joutuu koetukselle, kun
+        MI6-tiedustelupalvelun johtajan M:n (Judi Dench) menneisyydestä
+        nousee esiin salaperäinen uhka.
+
+	movie/007 Skyfall (2012)
 
 
 -------------------- ESIVALMISTELUT
+
+Linux
+=====
+
+apt-get -y install ffmpeg python python-pip ; pip install youtube-dl requests
+
+
+Windows
+=======
 
 Tarvittavat ohjelmat: Python 2.7, ffmpeg
 Ja pythoniin: youtube-dl, requests
@@ -44,10 +80,8 @@ Kopioi myös c:\Python27\Scripts\youtube-dl.exe samaan hakemistoon kun elisa-dl.
 
 -------------------- /ESIVALMISTELUT
 
-**TODO** Linux osuus:
-apt-get -y install ffmpeg python python-pip ; pip install youtube-dl
 
-... Lisää juttua mitä pitäisi huomioida. Tässä vielä tuo 'release' info:
+'release' info:
 
 https://yhteiso.elisa.fi/elisa-viihde-sovellus-ja-nettipalvelu-16/elisa-viihde-api-julkaisut-ja-bugiraportit-512104/index5.html#post588618
 
