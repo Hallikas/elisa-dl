@@ -672,7 +672,7 @@ def doDownload(filename, recordingUrl, programId):
 	file.close()
 	os.system(cmd)
 
-	return "%s.mp4" % (filename)
+	return filename
 
 # Move programId to another folderId
 def moveRecord(programId, folderId=config['donedir']):
