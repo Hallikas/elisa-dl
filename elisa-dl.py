@@ -30,24 +30,18 @@ import glob
 
 # Directory ID to save downloaded files
 # **TODO** - Possibility to use NAME as target. Also CREATE if does not exist.
-doneDir = 7693967 
+doneDir = 0
 
-# username, password and apiKey are not used here, those are loaded from
-# elisa-dl.conf file now.
-# Personal username and password for Elisa Viihde, you should NOT
-# share this information to anyone!
-username='* Elisa-viihde käyttäjätunnus *'
-password='* Elisa-viihde salasana *'
-
-# Api Developer parameters. Please change to your own.
-# You may try requesting one from Elisa or ask permission to use mine.
-apiKey='* Oma API avaimesi Elisa-Viihde palveluun *'
+useCache=False
+forceVars=False	# Write -var.txt and description .txt even of old one exists, Could be problem in case of dupes
+moveDupes=True		# Move record to done directory if file of same name exists
 
 # You should not touch these!
 clientSecret = 'nZhkFGz8Zd8w'
 apiUrl='https://api-viihde-gateway.dc1.elisa.fi/rest/npvr'
 apiPlat='platform=external'
 apiVer='v=2.1&appVersion=1.0'
+apiKey=None
 
 false=False
 true=True
@@ -57,8 +51,12 @@ reqHeaders = {}
 accessCode = {}
 accessToken = {}
 
+infiniteLoop=False
 has_match=False
 lookforcheck = 0
+doDirs = None
+disableAPI = False
+sys_os="unix"
 
 # Force utf8 encoding
 reload(sys)
@@ -153,6 +151,7 @@ def fixname(t, d):
 # Agent Cody Banks 2: Destination London, USA 2004. O. Kevin Allen. P: Frankie Mun
 # 28 Days Later, Britannia, 2002. O: Danny Boyle. P: Cillian Murphy, Naomie Harris
 # 28 Weeks Later,UK/Espanja,2007. O: Juan Carlos Fresnadillo. P: Robert Carlyle, Rose Byrne, Jeremy Renner. Lont
+# 1
 	if not has_match: v=lookfor("movie", "^(?P<name>[\d\wöäåÖÄÅøé\' ,:&\-\.]{1,45})(, ?)(?P<country>[\wöäåÖÄÅ/\-]+?)(, ?| )(?P<year>(19|20)\d\d)\. (?P<description>.*)$", v)
 
 # (Dans la maison, Ranska 2012) François Ozonin ohjaama draama äidinkielen opett
@@ -160,31 +159,37 @@ def fixname(t, d):
 # (Histoire immortelle/The Immortal Story, Ranska 1968) Orson Wellesin harvinainen
 # (The Secret Life Of Walter Mitty, USA 2013) Walter Mitty työskentelee Life-lehd
 # (My Old Lady, Englanti 2014) Sympaattisessa komediassa amerikkalainen tyhjätask
+# 2
 	if not has_match: v=lookfor("movie", "^\((?P<name>[\d\wöäåÖÄÅøé\' ,:&\-\./]{1,40}), (?!The|A)(?P<country>[\wöäåÖÄÅ/\-]+?) (?P<year>(19|20)\d\d)\)\.? ?(?P<description>.*)$", v)
 
 # (USA 2012) Palkittu fantasiadraama kertoo kuusivuotiaasta Hushpuppy-tytöstä, j
 # (Suomi 2015) Viktor Kärppä joutuu tahtomattaan keskelle Venäjän sisäistä v
 # (Korea/Ranska 2013) Toiminnallinen scifijännäri uudelle jääkaudelle ajautunu
 # (Ruotsi, 2016) Pahasti velkaantunut kirjailija joutuu pestautumaan satamatyölä
+# 3 
 	if not has_match: v=lookfor("movie", "^\((?P<country>(USA|Suomi|Ruotsi|Britannia|Korea/Ranska)),? (?P<year>(19|20)\d\d)(, \d+')?\)\.? (?P<description>.*)$", v)
 
 # (New Police Story/Hongkong-Kiina 2004). Poliisin eliittiryhmää johtava komisar
 # (Die Hard: With A Vengeance/USA 1995). Vauhdikas toimintatrilleri käynnistyy, k
 # (Mission: Impossible - Ghost Protocol/USA 2011). Menestyselokuvasarjan toiseksi
+# 4
 	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45})/(?P<country>[\wöäåÖÄÅ/\-]+?) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 
 # (Inside Man, trilleri, USA, 2006) Naamioituneet ryöstäjät linnoittautuvat man
 # (Charlie St. Cloud, draama, USA, 2010) Charliella on kyky nähdä edesmennyt vel
 # (Jurassic World, seikkailu/sci-fi, USA, 2015) Jurassic Park -elokuvasarjan nelj
 # (The Break-Up, romanttinen komedia, USA, 2006) Romanttinen komedia parisuhdeonge
-
 # (Mr. Beans Holiday, komedia, Iso-Britannia/Ranska, Saksa, 2006) Nolojen tilantei
 # (The International, trilleri, USA, Saksa, Iso-Britannia, 2009) Interpolin agentt
+# (Wanted, toiminta, USA, Saksa, 2008) Wesley elää tylsää kirjanpitäjän elämää, ku
 # (Two Brothers, draama, Ranska, iso-Britannia, 2004) 97 min. Villieläinkertomus
-	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45}), (?!USA)(?P<genre>[\wä\-/ ]+), (?P<country>[\wöäåÖÄÅ/\-]+?), (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+# 5
+	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45}), (?!USA)(?P<genre>[\wä\-/ ]+), (?P<country>[\wöäåÖÄÅ/\-]+(, [\wöäåÖÄÅ/\-]+)?), (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+# 6
 	if not has_match: v=lookfor("movie", "^\((?P<name>[\w ]+)/(?P<country>[\wöäåÖÄÅ/\-]{1,40}) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 
 # (/Saksa-Britannia-USA-Espanja 2006). Sharon Stone palaa kirjailija Catherine Tra
+# 7
 	if not has_match: v=lookfor("movie", "^\(/(?P<country>[\wöäåÖÄÅ/\-]{1,40}) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 
 # (Ocean's Thirteen 2007). Steven Soderberghin supertähdillä ryyditetty rikoskom
@@ -192,6 +197,7 @@ def fixname(t, d):
 # (22 Jump Street 2014). Toimintakomedia 21 Jump Streetin jatko-osassa konstaapel
 # (Horrible Bosses 2 2014). Mustan komedian jatko-osassa yrittäjiksi ryhtyneet ka
 # (Beautiful Mind, A 2001). Mestariohjaaja Ron Howardin (Apollo 13, Da Vinci -kood
+# 8
 	if not has_match: v=lookfor("movie", "^\((?P<name>.+?) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 
 # ( 1995). Klassikoksi nousseessa animaatioelokuvassa cowboynukke
@@ -206,6 +212,7 @@ def fixname(t, d):
 ## Series
 	if not has_match: v=lookfor("series", "^(Kausi (?P<season>\d+). (Jakso )?)?(?P<episode>\d+)/\d+\. ?(?P<description>.*)$", v)
 
+#	print "MATCH",has_match,lookforcheck
 ### NOT MOVIE OR EPISODE? Maybe we have eptitle anyway?
 	if not v.has_key('type'):
 # If known series
@@ -240,7 +247,7 @@ def fixname(t, d):
 			v['name'] = v['name'] + "E%02d" % int(v['episode'])
 
 ### If series, first sentence is title (only if less then 50 chars)
-		a=re.search("^(?P<eptitle>[\wöäåÖÄÅ \-/,]{2,50})[!\?\.]{1,2}( {1,2}(?P<description>.*))?$", v['description'])
+		a=re.search("^(?P<eptitle>[\wöäåÖÄÅ \-/,]{2,50})[!\?\.]{1,3}( {1,2}(?P<description>.*))?$", v['description'])
 		if a:
 			for b in a.groupdict(): v[b] = a.groupdict()[b]
 
@@ -268,6 +275,7 @@ def fixname(t, d):
 
 	if v.has_key('match'): del v["match"]
 	v['name'] = re.sub(r'[\\/*?:"<>|]',"_",v['name'])
+	v['title'] = re.sub(r'[\\/*?:"<>|]',"_",v['title'])
 
 	filename = "%s/%s" % (v['type'].lower(), v['name'])
 	if v['type'] == "Series":
@@ -375,14 +383,26 @@ def show_vars(var, lvl=0):
 	else:
 		st += "\'%s\'" % re.sub("\'", "\\\'", str(var))
 	return st
+###
+##
+def lookYesNo(test):
+	if test in ['false','off','no']: return False
+	if test in ['true','on','yes']: return True
+	return None
+
 ##
 ## API Functions
 def doApiProcess(ret = None):
-#	print "_doApiProcess()"
+
 	r={}
 	r['reason'] = ret.reason
 	r['status'] = ret.status_code
 	r['headers'] = {}
+
+	if ret.status_code != 200:
+		print show_vars(r)
+		sys.exit(1)
+
 	for b in ret.headers:
 		if b in ['Content-Type','Set-Cookie','X-RateLimit-Remaining-second','X-RateLimit-Remaining-minute','X-RateLimit-Limit-second','X-RateLimit-Limit-minute']:
 			r['headers'][b] = ret.headers[b]
@@ -393,18 +413,19 @@ def doApiProcess(ret = None):
 		r['headers']['X-RateLimit-Limit-minute'] = ret.headers['X-RateLimit-Limit-minute']
 		r['headers']['X-RateLimit-Remaining-minute'] = ret.headers['X-RateLimit-Remaining-minute']
 
+
 # Print ratelimit information, for debug purpouses when doing multiple requests
 #	print "RateLimit:",
 #	print "sec: "+r['headers']['X-RateLimit-Remaining-second']+'/'+r['headers']['X-RateLimit-Limit-second'],
 #	print "min: "+r['headers']['X-RateLimit-Remaining-minute']+'/'+r['headers']['X-RateLimit-Limit-minute']
 
 	if int(r['headers']['X-RateLimit-Remaining-second']) < 1:
-		print "Throttling because RateLimit"
-		print "sec: "+r['headers']['X-RateLimit-Remaining-second']+'/'+r['headers']['X-RateLimit-Limit-second'],
+		print "Requests per second left: "+r['headers']['X-RateLimit-Remaining-second']+'/'+r['headers']['X-RateLimit-Limit-second']
+#		print "Throttling because RateLimit"
 		time.sleep(1)
 	if int(r['headers']['X-RateLimit-Remaining-minute']) < 20:
+		print "Requests per minute left: "+r['headers']['X-RateLimit-Remaining-minute']+'/'+r['headers']['X-RateLimit-Limit-minute'],
 		print "Throttling because RateLimit"
-		print "min: "+r['headers']['X-RateLimit-Remaining-minute']+'/'+r['headers']['X-RateLimit-Limit-minute']
 		time.sleep(10)
 
 	if r['status'] != 200:
@@ -420,6 +441,9 @@ def doApiProcess(ret = None):
 
 # API POST function
 def doApiPost(url, data=false):
+	if disableAPI:
+		print "_doApiProcess()"
+		return
 	if auth:
 		reqHeaders = auth
 	else:
@@ -435,6 +459,9 @@ def doApiPost(url, data=false):
 
 # API GET function
 def doApiGet(url, data=false):
+	if disableAPI:
+		print "_doApiProcess()"
+		return
 	if not auth:
 		print "Missing Authentication"
 		sys.exit(1)
@@ -490,47 +517,61 @@ def osfilename(fn):
 
 # Do download.
 def doDownload(filename, recordingUrl):
-# Print some debug info
-	print "doDownload(%s, %s)" % (filename, recordingUrl)
 # I wish this would work, but no... youtube-dl crashes because utf8 encoding problems
 #	filename = osfilename(filename)
-# Get with ffmpeg, best video and audio, BIG file
+	filename = "tmp/%s" % (filename)
+
+	# If you need to debug formats
+	if not os.path.exists(osfilename(filename)+"-formats.txt"):
+		cmd='youtube-dl --list-formats \"'+recordingUrl+'\"'
+		file=open(osfilename(filename)+'-formats.txt', 'w')
+		strFormats=subprocess.check_output(cmd, shell=True)
+		file.write(strFormats)
+		file.close()
+
+# Limit bitrate to 3Mbit and sub FullHD resoluition, if available.
+	filt_video='bestvideo[tbr<=?3000]/bestvideo[width<=1920][height<=1080]/bestvideo'
+# Limit audio to 192 aac, prefer Finnish track first, always try skip eac3 because problems with ffmpeg
+	filt_audio="bestaudio[format_id*=aacl-192][format_id*=Finnish]/bestaudio[format_id*=aacl-192]/bestaudio[format_id!=audio-ec-3-224-Multiple_languages]"
+
+# You should use native HLS with this, because of eac3
+	#filt_video='bestvideo'
+	#filt_audio='bestaudio[format_id*=ec-3]/bestaudio[format_id*=aacl-192]/bestaudio'
+
+	cmd = "youtube-dl"
+
+# Select ONE HLS downloaders! Notice, ffmpeg can't handle eac3 audio but native could have audio problems
+	cmd = "%s %s" % (cmd, '--hls-prefer-ffmpeg --external-downloader-args "-stats -hide_banner -loglevel warning"')
+# Audio problems with this one! Be careful!
+#	cmd = "%s %s" % (cmd, '--hls-prefer-native')
+
+# Filters
+	cmd = "%s -f \"(%s)+(%s)\"" % (cmd, filt_video, filt_audio)
+# Output
+	cmd = "%s -o \"%s.%%(ext)s\"" % (cmd, filename)
+# URL
+	cmd = "%s \"%s\"" % (cmd, recordingUrl)
+
+# Get with ffmpeg, 'copy-as-is', best video and audio, BIG file!
 # On Windows system this can cause problems, I have one report about it.
-#	cmd = 'ffmpeg -i \"' + recordingUrl + '\" -c copy \"' + filename + '.mp4\"'
-# Get best of > 720p (HD)
-#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height>720])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Multiple_languages/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# Get best of <= 720p, with standard audio (or best)
-#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?720])+(audio-aacl-192-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# Well, get ANYTHING less then 1000px (1920x1080) is too big for this ;)
-#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[height<=?999])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# eac3 audio is not supported by ffmpeg, works just fine, but crashes if audio is eac3
-#	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-# Audio problems sometimes. Maybe not best choice.
-#	cmd = ( 'youtube-dl --hls-prefer-native -f \"(bestvideo[vbr<=?3000])+(audio-ec-3-224-Multiple_languages/audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/audio-aacl-48-Finnish/audio-aacl-48-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
+# This OVERIDES everything above!
+#	cmd = 'ffmpeg -i \"%s\" -c copy \"%s.mp4\"' % (recordingUrl, filename)
 
-# Note! last cmd wins.
-
-# Get best video that is less then 3Mbit/s bitrate. I think that 6Mbit/s it soo much, I can live with 720p
-	cmd = ( 'youtube-dl --hls-prefer-ffmpeg -f \"(bestvideo[vbr<=?3000])+(audio-aacl-192-Finnish/audio-aacl-192-Multiple_languages/bestaudio)/best\" -o \"' + filename + '.%(ext)s\" \"' + recordingUrl + '\"' )
-
-	print cmd
 # Write our status to elisa-dl.log
-	file=open("elisa-dl.log", 'a')
-	file.write("CMD: %s\n" % cmd)
+	file=open("elisa-dl-cmd.log", 'w')
+	file.write("%s\n" % cmd)
 	file.close()
-
 # Just my own debug interrupt
-	if os.path.exists("not-download"):
+	if os.path.exists("no-download"):
 		sys.exit(0)
 # Execute downloading
 	os.system(cmd)
-	return
+
+	return "%s.mp4" % (filename)
 
 # Get data about all folders.
 def getFolders():
-### DISABLE CACHE
-#	if not os.path.exists("var/cache-fData.var"):
-	if 1:
+	if not useCache or not os.path.exists("var/cache-fData.var"):
 		(r, getData) = doApiGet(apiUrl+'/folders'+'?'+apiPlat+'&'+apiVer)
 		if (r["status"] != 200):
 			print "Failed to load folders data",getData.status_code
@@ -546,9 +587,7 @@ def getFolders():
 def getFolder(folderId):
 # Do we have cached data for folder?
 # **TODO** Expire!
-### DISABLE CACHE
-#	if not os.path.exists("var/cache-fData-%d.var" % folderId):
-	if 1:
+	if not useCache or not os.path.exists("var/cache-fData-%d.var" % folderId):
 # Do API Request, notice EXTRA big pageSize and includeMetadata
 # **TODO** We should sort data somehow... maybe when processing
 		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?'+apiPlat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
@@ -576,12 +615,12 @@ def moveRecord(programId, folderId=doneDir):
 
 	headers = auth
 	headers['content-type'] = 'application/x-www-form-urlencoded'
-	try:
-		ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (programId, folderId), headers=headers)
-		r = doApiProcess(ret)
-	except:
-# **TODO** We don't have exception handling, YET
-		pass
+#	try:
+	ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (programId, folderId), headers=headers)
+	r = doApiProcess(ret)
+#	except:
+# **TODO** We don't have exception handling, YET.. What to do if moving to doneDir fails?
+#	pass
 	return
 
 #
@@ -589,12 +628,11 @@ def moveRecord(programId, folderId=doneDir):
 def checkQuit():
 	if os.path.exists("/quit") or os.path.exists("quit"):
 		print "Quit requested"
-		sys.exit(0)
+		return True
+	return None
 
-###
-### MAIN CODE STARTS FROM HERE!
-###
-if __name__ == "__main__":
+def loadConfig():
+	global username, password, apiKey, doneDir, doDirs, useCache, moveDupes, infiniteLoop
 	if not os.path.exists("elisa-dl.conf"):
 		print "You should copy elisa-dl.sample.conf to elisa-dl.conf"
 		print "And edit it to contain your Elisa-Viihde username and password"
@@ -602,141 +640,338 @@ if __name__ == "__main__":
 		print
 		sys.exit(1)
 	fp = open("elisa-dl.conf", 'r')
+	line = ""
 	while 1:
 		line = fp.readline()
-		if len(line) < 1: break
+		if not line: break
+		if len(line) <= 1 or line[1:] == "#": continue
+
 		a=re.search('^username\s*=\s*(?P<user>[\w\d]+)',line,re.IGNORECASE)
 		if a: username=a.groupdict()['user']
 		a=re.search('^password\s*=\s*(?P<pass>[\w\d]+)',line,re.IGNORECASE)
 		if a: password=a.groupdict()['pass']
 		a=re.search('^apikey\s*=\s*(?P<apikey>[\w\d]+)',line,re.IGNORECASE)
 		if a: apiKey=a.groupdict()['apikey']
+
+		a=re.search('^donedir\s*=\s*(?P<donedir>[\d]+)',line,re.IGNORECASE)
+		if a:
+			doneDir=int(a.groupdict()['donedir'])
+		a=re.search('^dodirs\s*=\s*(?P<dodirs>[\d]+)',line,re.IGNORECASE)
+		if a:
+			doDirs=[ int(a.groupdict()['dodirs']) ]
+		a=re.search('^cache\s*=\s*(?P<usecache>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			useCache=a.groupdict()['usecache']
+			useCache=lookYesNo(useCache)
+
+		a=re.search('^move-dupes\s*=\s*(?P<movedupes>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			moveDupes=a.groupdict()['movedupes']
+			moveDupes=lookYesNo(moveDupes)
+
+		a=re.search('^infinite-loop\s*=\s*(?P<infiniteloop>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			infiniteLoop=a.groupdict()['infiniteloop']
+			infiniteLoop=lookYesNo(infiniteLoop)
 	fp.close()
 
-# Mahe cache directory
-	if not os.path.exists('var'): os.makedirs('var', 0755)
+	if sys.platform == 'win32':
+		sys_os="win"
+	return
+
+#
+# Main Magic
+def main():
+	global clientSecret, apiUrl, apiPlat, apiVer
+	global auth, accessCode, accessToken, reqHeaders
+	global username, password, apiKey, doneDir, doDirs, useCache, moveDupes, infiniteLoop
+	global lookforcheck, disableAPI, has_match
+	global false, true, sys_os
+
+	global doneDir, useCache, forceVars, moveDupes
+
+	firstRun = True
+	while firstRun or infiniteLoop:
+		if checkQuit(): break # /InfiniteLoop
+		firstRun = False
+		loadConfig()
+
+# Make cache directory
+		if not os.path.exists('var'): os.makedirs('var', 0755)
 # Make temp download directory
-	if not os.path.exists('tmp'): os.makedirs('tmp', 0755)
+		if not os.path.exists('tmp'): os.makedirs('tmp', 0755)
+##
+## Login
+		if len(auth) == 0: auth = login()
 
 # Check if we have fullData cached
 # **TODO** Expire for cached data.
-### DISABLE CACHE
-#	if not os.path.exists("var/cache-fullData.var"):
-	if 1:
-# Log into Elisa system
-		auth = login()
+		if not useCache or not os.path.exists("var/cache-fullData.var"):
 # Get data about folders
-		fData = getFolders()
+			fData = getFolders()
 # Set fullData base structre from folder data
-		fullData = fData
+			fullData = fData
 # Loop thru folders
-		for f in fData:
+			for f in fData:
 # Show folder ID and Name, mainly for debugging
-			print "Directory %d: %s" % (f, fData[f]["name"])
+				print "Reading directory %d: %s" % (f, fData[f]["name"])
 # Read data about PROGRAM from folder
-			rData = getFolder(f)
-			if len(rData) == 0: continue
+				rData = getFolder(f)
+				if len(rData) == 0: continue
 # Create entry for program in fullData
-			fullData[f]["program"] = rData
-			for r in rData:
-				r=rData[r]
+				fullData[f]["program"] = rData
+				for r in rData:
+					r=rData[r]
 # Save cached data to disk
-		save_vars(fullData, "var/cache-fullData.var")
+			save_vars(fullData, "var/cache-fullData.var")
 # Load cached data.  We could skip this (if cache is created), but I want to
 # keep this so we can detect problems. With cache handling.
-	fullData = load_vars("var/cache-fullData.var")
+		fullData = load_vars("var/cache-fullData.var")
 ## **TODO** Verify cache
+## - If we poll folders and notify if program count changes?
 ## - Load directory information (fData) from Elisa
 ## - Reload directory data if does not match
 
 ##
 ## Login and download
-	if len(auth) == 0: auth = login()
+		print "Here"
+		if len(auth) == 0: auth = login()
 # Loop thru full data (cached), by folders
-	for a in fullData:
-		folderId=a
-# Loop if we don't have program entries.
-		if fullData[folderId]['count'] < 1: continue
-# Skip doneDir
-		if folderId in [doneDir]: continue
-#
+		for a in fullData:
+			if checkQuit(): break # /InfiniteLoop
+			folderId=a
 # **TODO** My own debug - Do ONLY THESE
+			if doDirs and folderId not in doDirs: continue
+			print "Processing folder '%s' (%d)" % (fullData[folderId]['name'], folderId)
+# Loop if we don't have program entries.
+			if fullData[folderId]['count'] < 1: continue
+# Skip doneDir
+			if folderId in [doneDir]: continue
 #
-#		if folderId not in [8037870, 0]: continue
 
 # For now, a-variable contains id of entry on fullData. But we like to hand
 # as it would be data of fullData[a]. So we assign it.
 # **TODO** a - folderData, p - programId
-		a = fullData[folderId]
+			a = fullData[folderId]
 # Loop thru all files in directory, assign p (programId)
-		for p in a['program']:
+			for p in a['program']:
 # checkQuit() is function to check if we have 'quit' file.  So user can
 # terminate session AFTER downloading is done, that would be nice way to
 # kill run.
-			checkQuit()
+				if checkQuit(): break # /InfiniteLoop
 
 # Generate filename.  Filename is done by using transmission name and then
 # we try look some metadata from description, like original name and year.
-			filename=fixname(a['program'][p]['name'],a['program'][p]['description'])
+				filename=fixname(a['program'][p]['name'],a['program'][p]['description'])
+
+# Verify that target directory does exist
+				nameDir, nameFile = os.path.split(filename)
+				if not os.path.exists(osfilename(nameDir)): os.makedirs(osfilename(nameDir), 0755)
+
+# We would like to save our 'variable' file, that contains ALL metadata from Elisa.
+# **TODO** You may not want to have this in FINAL release, but other hands. I think it is nice to have
+# metadata, I just wish I could utilize it... Hmm, maybe Plex has good API to push data in?
+				if forceVars or not os.path.exists(osfilename(filename)+"-var.txt"):
+					save_vars(a['program'][p], osfilename(filename)+'-var.txt')
+
+# Before downloading. create 'filename.txt' that contains 'description' for program.
+# But only if description data exists.
+# **TODO** Poll, Should be configurable on/off?
+				if a['program'][p].has_key('description'):
+					if forceVars or not os.path.exists(osfilename(filename)+".txt"):
+						file=open(osfilename(filename)+'.txt', 'w')
+						file.write(a['program'][p]['description'].encode('utf8'))
+						file.close()
+				if checkQuit(): break # /InfiniteLoop
 
 # Check that if we have match on target already.
 # **TODO** Should we add 'send' date/time on target filename.  After that it
 # would be possible download duplicates of program, if it is from another
 # transmission
-			if os.path.exists(osfilename(filename)+".mp4"):
-				print "DUPE %s: %s.mp4" % (p, filename)
-				file=open("elisa-dl.log", 'a')
-				file.write("DUPE %s: %s.mp4\n" % (p, filename))
-				file.close()
-				continue
-
-# Verify that we are logged in
-			auth=login()
-# Retrieve download URL for program
-			url=apiUrl+'/recordings/url/'+str(p)+'?platform=ios&'+apiVer
-			getRecordingUrl=requests.get(url, headers=auth)
-			recordingUrl=json.loads(getRecordingUrl.text)
-
-			checkQuit()
-# Write our status to elisa-dl.log
-			file=open("elisa-dl.log", 'a')
-			file.write("Downloading %s: %s\n" % (p, filename))
-			file.close()
-# Verify that target directory does exist
-			nameDir, nameFile = os.path.split(filename)
-			if not os.path.exists(osfilename(nameDir)): os.makedirs(osfilename(nameDir), 0755)
-
-# Before downloading. create 'filename.txt' that contains 'description' for program.
-# But only if description data exists.
-# **TODO** Poll, Should be configurable on/off?
-			if a['program'][p].has_key('description'):
-				if not os.path.exists(osfilename(filename)+".txt"):
-					file=open(osfilename(filename)+'.txt', 'w')
-					file.write(a['program'][p]['description'].encode('utf8'))
+				if os.path.exists("%s.mp4" % osfilename(filename)):
+					print "DUPE %s: %s.mp4" % (p, filename)
+					file=open("elisa-dl.log", 'a')
+					file.write("DUPE %s: %s.mp4\n" % (p, filename))
 					file.close()
-# Retrieve list of possible formats, and save it. This is mainly for debugging purpouses
-# **TODO** Remove/Comment from final release.
-			if not os.path.exists(osfilename(filename)+"-formats.txt"):
-				cmd='youtube-dl --list-formats \"'+recordingUrl["url"]+'\"'
-				file=open(osfilename(filename)+'-formats.txt', 'w')
-				strFormats=subprocess.check_output(cmd, shell=True)
-				file.write(strFormats)
-				file.close()
-# Also we would like to save our 'variable' file, that contains ALL metadata from Elisa.
-# **TODO** You may not want to have this in FINAL release
-			if not os.path.exists(osfilename(filename)+"-var.txt"):
-				save_vars(a['program'][p], osfilename(filename)+'.var')
-			time.sleep(1)
-			checkQuit()
+					if moveDupes:
+						moveRecord(p, doneDir)
+					continue
 
-# If target file does not exist, continue
-			if not os.path.exists("%s.mp4" % osfilename(filename)) and not os.path.exists("tmp/%s.mp4" % nameFile):
+# Write our status to elisa-dl.log
+
+				tmpFile = "tmp/%s.mp4" % nameFile
 # Use our own doDownload function to download file
-				doDownload("tmp/%s" % nameFile, recordingUrl["url"])
+				if not os.path.exists(tmpFile):
+# Verify that we are logged in
+					auth=login()
+# Retrieve download URL for program
+					url=apiUrl+'/recordings/url/'+str(p)+'?platform=ios&'+apiVer
+					getRecordingUrl=requests.get(url, headers=auth)
+					recordingUrl=json.loads(getRecordingUrl.text)
+
+					print "Downloading %s: %s" % (p, filename)
+					file=open("elisa-dl.log", 'a')
+					file.write("Downloading %s: %s.mp4\n" % (p, filename))
+					file.close()
+					tmpFile = doDownload("%s" % nameFile, recordingUrl["url"])
+# I hope that this helps to interrupt that record is not moved to Done directory in case of CTRL-C quit
+					time.sleep(2)
+				else:
+					print "Found program from temp %s: %s" % (p, filename)
+					file=open("elisa-dl.log", 'a')
+					file.write("Move from temp %s: %s.mp4\n" % (p, filename))
+					file.close()
+				
 # After download, move to 'doneDir'
 				moveRecord(p, doneDir)
 # And rename file from 'tmp' directory to real target directory
-				os.rename("tmp/%s.mp4" % nameFile, "%s.mp4" % osfilename(filename))
-			checkQuit()
+				toDir, toFName = os.path.split(osfilename(filename))
+				try:
+					if not os.path.exists(toDir):
+						os.makedirs(toDir, 0755)
+				except IOError as err:
+					print "%s: %s" % (err.strerror, doDir)
+					sys.exit(1)
+				os.rename(tmpFile, "%s.mp4" % osfilename(filename))
+					
+				if checkQuit(): break # /InfiniteLoop
+			if checkQuit(): break # /InfiniteLoop
+		if checkQuit(): break # /InfiniteLoop
+		if infiniteLoop:
+			print "Sleeping for 60 seconds in infiniteLoop until checking Elisa-Viihde again."
+			time.sleep(60)
+	# /infiniteLoop	
 
+
+
+def testVar(varFile = None):
+	## **TODO** / Work in progress
+	# Filename Test, give -var file as parameter:
+	if not varFile:
+		print "You must give -var file as parameter"
+		sys.exit(1)
+	try:
+		varData=load_vars(varFile)
+	except:
+		print "%s is not var-file or it is broken" % varFile
+		sys.exit(1)
+
+	print "Channel:",varData["channelName"]
+	print "Type:",varData["showType"]
+	print "Start:",varData["startTime"]
+	print
+	print "Title:",varData['name']
+	print "Description:"
+	print varData['description']
+	print
+	print fixname(varData['name'], varData['description'])
+	sys.exit(0)
+
+def fileRename(doFile = None):
+	if not doFile:
+		print "You must give file as parameter"
+		sys.exit(1)
+
+	nameDir, nameFile = os.path.split(doFile)
+	nameFile = re.sub('(-formats|-var)?.(txt|mp4|var)$', '', nameFile)
+
+	if nameDir: doFile = "%s/%s" % (nameDir, nameFile)
+	else: doFile = nameFile
+	if os.path.exists("%s.var" % doFile): varFile="%s.var" % doFile
+	else: varFile="%s-var.txt" % doFile
+	try:
+		varData=load_vars(varFile)
+	except IOError as err:
+		print "%s: %s-var.txt" % (err.strerror, doFile)
+		sys.exit(1)
+
+	childFiles=glob.glob(doFile+"*")
+	toFile=fixname(varData['name'], varData['description'])
+
+	if len(childFiles) > 6:
+		print "FATAL: More then 6 files matches with %s. Too dangerous, please verify." % doFile
+		sys.exit(1)
+
+	FixName = doFile
+	FixName=re.sub('\(','\(',FixName)
+	FixName=re.sub('\)','\)',FixName)
+	FixName=re.sub('\[','\[',FixName)
+	FixName=re.sub('\]','\]',FixName)
+
+	# Loop all thru first, just to make sure that target does not exist
+	for fromFile in childFiles:
+		ext=re.sub(FixName, '', fromFile)
+		if os.path.exists('%s%s' % (toFile, ext)):
+			print "Fatal, target exists: %s%s" % (toFile, ext)
+			sys.exit(1)
+
+	toDir, toFName = os.path.split(toFile)
+	try:
+		if not os.path.exists(toDir):
+			os.makedirs(toDir, 0755)
+	except IOError as err:
+		print "%s: %s" % (err.strerror, doDir)
+		sys.exit(1)
+
+	for fromFile in childFiles:
+		ext=re.sub(FixName, '', fromFile)
+		try:
+			os.rename(fromFile, "%s%s" % (toFile, ext))
+			print "'%s' -> '%s%s'" % (fromFile, toFile, ext)
+		except OSError as err:
+			print "%s: %s-var.txt" % (err.strerror, doFile)
+			continue
+	return
+
+def findProgram(doFile = None):
+	if not doFile:
+		print "You must give file as parameter"
+		sys.exit(1)
+
+	nameDir, nameFile = os.path.split(doFile)
+	nameFile = re.sub('(-formats|-var)?.(txt|mp4|var)$', '', nameFile)
+
+	fullData = load_vars("var/cache-fullData.var")
+	isFound = None
+	for folderId in fullData:
+		if not fullData[folderId].has_key('program'): continue
+		for programId in fullData[folderId]['program']:
+#			if programId not in [12051853]: continue
+			prog = fullData[folderId]['program'][programId]
+			oldName="%s (%s)" % (re.sub('^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',prog['name']), re.sub(r'(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d','\g<1>\g<2>\g<3>_\g<4>\g<5>',prog['startTime']))
+			newDir, newName=os.path.split(fixname(prog['name'],prog['description']))
+
+#			print "Old",oldName
+#			print "Find",nameFile
+#			print "New",newName
+#			print
+
+			if nameFile == oldName or  nameFile == newName:
+				if nameDir:
+					save_vars(prog, nameDir+"/"+osfilename(nameFile)+'-var.txt')
+				isFound = True
+			if isFound: break
+		if isFound: break
+	if isFound: fileRename(nameDir+"/"+osfilename(nameFile)+'-var.txt')
+	if not isFound:
+		print "Can't find information about", nameFile
+	return
+
+###
+### MAIN CODE STARTS FROM HERE!
+###
+if __name__ == "__main__":
+	if not sys.argv[1:]:
+		print main()
+	elif sys.argv[1:][0] == "lookup" or sys.argv[1:][0] == "find":
+		if len(sys.argv) >= 3:
+			for i, fn in enumerate(sys.argv[2:]):
+				findProgram(fn)
+	elif sys.argv[1:][0] == "filename" or sys.argv[1:][0] == "test":
+		if len(sys.argv) >= 3:
+			testVar(sys.argv[2:][0])
+	elif sys.argv[1:][0] == "rename":
+		if len(sys.argv) >= 3:
+			for i, fn in enumerate(sys.argv[2:]):
+				fileRename(fn)
 sys.exit(0)
