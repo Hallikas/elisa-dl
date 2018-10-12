@@ -19,6 +19,13 @@ fine too.
 Command line parameters:
 elisa-dl.py find filename.mp4 - Tries to find programId by filename, writes -var.txt file for file and renames. (use in case of missing -var)
 Example:
+	$ ls -l tmp/Safety\ not\ Guaranteed*
+	-rwxrwxrwx 1 semi semi 5287504353 Oct  5 05:57 'tmp/Safety not Guaranteed (2012).mp4'
+
+	$ ./elisa-dl.py find tmp/Safety\ not\ Guaranteed\ \(S\)\ \(20180512_2100\).mp4
+	'tmp/Safety not Guaranteed (S) (20180512_2100)-var.txt' -> 'movie/Safety not Guaranteed (2012)-var.txt'
+	'tmp/Safety not Guaranteed (S) (20180512_2100).mp4' -> 'movie/Safety not Guaranteed (2012).mp4'
+
 
 elisa-dl.py rename file-var.txt - Renames file* files. Uses -var file to get data for generating filename.
 Example:
@@ -29,6 +36,7 @@ Example:
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko-var.txt~' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko-var.txt~'
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko.mp4' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko.mp4'
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko.txt' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko.txt'
+
 
 elisa-dl.py filename test-var.txt - Shows metadata from -var file, also shows what filename would be in case of rename.
 Example:
