@@ -9,28 +9,30 @@
 
 
 /* ************************************************************************
-
+```
 This README is not done!  This works as notepad for now, but I will
 focus on this later.  I try keep development language in english, but
 because this software is mainly for Finnish people, using Finnish is just
 fine too.
-
+```
 ************************************************************************ */
 
 
 Command line parameters:
 elisa-dl.py find filename.mp4 - Tries to find programId by filename, writes -var.txt file for file and renames. (use in case of missing -var)
 Example:
+```
 	$ ls -l tmp/Safety\ not\ Guaranteed*
 	-rwxrwxrwx 1 semi semi 5287504353 Oct  5 05:57 'tmp/Safety not Guaranteed (2012).mp4'
 
 	$ ./elisa-dl.py find tmp/Safety\ not\ Guaranteed\ \(S\)\ \(20180512_2100\).mp4
 	'tmp/Safety not Guaranteed (S) (20180512_2100)-var.txt' -> 'movie/Safety not Guaranteed (2012)-var.txt'
 	'tmp/Safety not Guaranteed (S) (20180512_2100).mp4' -> 'movie/Safety not Guaranteed (2012).mp4'
-
+```
 
 elisa-dl.py rename file-var.txt - Renames file* files. Uses -var file to get data for generating filename.
 Example:
+```
 	(after fixing: "name": 'Simpsonit 29. kausi (7)' -> "name": 'Simpsonit (7)' from -var file)
 	$ ./elisa-dl.py rename series/Simpsonit\ 29.\ kausi/Simpsonit\ 29.\ kausi\ -\ S29E14\ -\ Pellen\ pahin\ pelko-var.txt
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko-formats.txt' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko-formats.txt'
@@ -38,10 +40,11 @@ Example:
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko-var.txt~' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko-var.txt~'
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko.mp4' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko.mp4'
 	'series/Simpsonit 29. kausi/Simpsonit 29. kausi - S29E14 - Pellen pahin pelko.txt' -> 'series/Simpsonit/Simpsonit - S29E14 - Pellen pahin pelko.txt'
-
+```
 
 elisa-dl.py filename test-var.txt - Shows metadata from -var file, also shows what filename would be in case of rename.
 Example:
+```
 	$ ./elisa-dl.py filename movie/007\ Skyfall\ \(2012\)-var.txt
 	Channel: Nelonen
 	Type: MOVIE
@@ -56,19 +59,15 @@ Example:
         nousee esiin salaperäinen uhka.
 
 	movie/007 Skyfall (2012)
+```
 
+## ESIVALMISTELUT
 
--------------------- ESIVALMISTELUT
-
-Linux
-=====
-
+### Linux
 apt-get -y install ffmpeg python python-pip ; pip install youtube-dl requests
 
 
-Windows
-=======
-
+### Windows
 Tarvittavat ohjelmat: Python 2.7, ffmpeg
 Ja pythoniin: youtube-dl, requests
 
@@ -88,10 +87,8 @@ c:\Python27\Scripts\pip2.exe install requests
 
 Kopioi myös c:\Python27\Scripts\youtube-dl.exe samaan hakemistoon kun elisa-dl.py ha ffmpeg.exe
 
--------------------- /ESIVALMISTELUT
 
-
-'release' info:
+## 'release' info:
 
 https://yhteiso.elisa.fi/elisa-viihde-sovellus-ja-nettipalvelu-16/elisa-viihde-api-julkaisut-ja-bugiraportit-512104/index5.html#post588618
 
@@ -106,3 +103,4 @@ Käytännössä se käy kaikki Viihde kansiot läpi ja lataa tallenteet omalle k
 Koodi on GitHubissa https://github.com/Hallikas/elisa-dl ja varoituksena tosiaan se että tuo on varhainen versio. (Ei poista mitään palvelimelta, siirtää ladatut 'done' kansioon, minkä pystyy itse tuolla .py koodissa määrittelemään.
 
 Linux käyttäjänä kohdeympäristö oli tietysti Linux, mutta koska originaali python oli tehty windowssiin ja kaveri vähän pyysi, tein tuosta yhteensopivan molempiin ympäristöihin.
+
