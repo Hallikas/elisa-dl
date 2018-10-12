@@ -9,10 +9,12 @@
 
 
 /* ************************************************************************
+
 This README is not done!  This works as notepad for now, but I will
 focus on this later.  I try keep development language in english, but
 because this software is mainly for Finnish people, using Finnish is just
 fine too.
+
 ************************************************************************ */
 
 
