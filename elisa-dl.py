@@ -505,8 +505,8 @@ def getAccessToken():
 	if not token.has_key('access_token'):
 		payload = {
 			'grant_type': 'authorization_code',
-			'username': username,
-			'password': password,
+			'username': config['username'],
+			'password': config['password'],
 			'client_id': 'external',
 			'code': getAccessCode()
 		}
@@ -675,7 +675,9 @@ def doDownload(filename, recordingUrl, programId):
 	return filename
 
 # Move programId to another folderId
-def moveRecord(programId, folderId=config['donedir']):
+def moveRecord(programId, folderId=config['donedir'], fromFolder=None):
+	global fullData
+
 	if not auth:
 		print "Missing Authentication"
 		sys.exit(1)
@@ -685,6 +687,17 @@ def moveRecord(programId, folderId=config['donedir']):
 	ret = requests.put(apiUrl+'/recordings/move?platform=external&v=2&appVersion=1.0', data='programId=%d&folderId=%d' % (int(programId), int(folderId)), headers=headers)
 	r = doApiProcess(ret)
 # **TODO** We don't have exception handling, YET.. What to do if moving to doneDir fails?
+# Now we just crash
+
+# Update cache too, well this is good idea... but
+# In normal situation, we are in loop that utilizes fullData information now
+# when we move data inside of it, that loop does not get so well.
+# Maybe we need to figure out some other way to loop?
+#	if fromFolder:
+#		tmp=fullData['folder'][fromFolder]['programs'][int(programId)]
+#		fullData['folder'][folderId]['programs'][int(programId)]=tmp
+#		del fullData['folder'][fromFolder]['programs'][int(programId)]
+#		save_vars(fullData, "var/cache-fullData.var")
 	return
 
 ### -----------------------------------------------------------------------
@@ -834,11 +847,14 @@ def getProgram(programId):
 #	if checkQuit(): return # /InfiniteLoop
 	program = fullData['program'][int(programId)]
 
+	fromFolder=None
 	for folderId in fullData['folder']:
 		if not fullData['folder'][folderId].has_key('programs'): continue
 		if fullData['folder'][folderId]['programs'].has_key(int(programId)):
 			program=fullData['folder'][folderId]['programs'][int(programId)]
+			fromFolder=folderId
 			break
+		if fromFolder: break
 			
 	oldName="%s (%s)" % (re.sub('^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',program['name']), re.sub(r'(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d','\g<1>\g<2>\g<3>_\g<4>\g<5>',program['startTime']))
 	filename = fixname(program['name'],program['description'])
@@ -853,7 +869,7 @@ def getProgram(programId):
 		file.write("DUPE %s: %s.mp4\n" % (programId, filename))
 		file.close()
 		if config['moveDupes'] and config['donedir']:
-			moveRecord(programId, config['donedir'])
+			moveRecord(programId, config['donedir'], fromFolder)
 	else:
 		tmpFile = osfilename("tmp/%s" % fileName)
 
@@ -890,10 +906,10 @@ def getProgram(programId):
 ### -----------------------------------------------------------------------
 ### Cache/Get Data
 ### -----------------------------------------------------------------------
-def cacheProgramData(folderId):
+def cacheProgramData(folderId, force=None):
 	global apiUrl, apiPlat, apiVer
-#	if not config['usecache'] or
-	if not os.path.exists("var/cache-fData-%d.var" % folderId):
+
+	if force or not config['usecache'] or not os.path.exists("var/cache-fData-%d.var" % folderId):
 		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?'+apiPlat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
 		if (r["status"] != 200):
 			print "Failed to load recording data for folder %d" % (folderId), r["status"]
@@ -905,10 +921,10 @@ def cacheProgramData(folderId):
 	varData=load_vars("var/cache-rData-%d.var" % folderId)
 	return varData
 
-def cacheFolderData():
+def cacheFolderData(force=None):
 	global apiUrl, apiPlat, apiVer
-#	if not config['usecache'] or 
-	if not os.path.exists("var/cache-fData.var"):
+
+	if force or not config['usecache'] or not os.path.exists("var/cache-fData.var"):
 		(r, getData) = doApiGet(apiUrl+'/folders'+'?'+apiPlat+'&'+apiVer)
 		if (r["status"] != 200):
 			print "Failed to load folders data",getData.status_code
@@ -920,11 +936,10 @@ def cacheFolderData():
 	varData=load_vars("var/cache-fData.var")
 	return varData
 
-def cacheFullData():
+def cacheFullData(force=None):
 	global fullData
 
-#	if not config['usecache'] or 
-	if not os.path.exists("var/cache-fullData.var"):
+	if force or not config['usecache'] or not os.path.exists("var/cache-fullData.var"):
 		fullData['folder'] = cacheFolderData()
 		fullData['program'] = {}
 		for folderId in fullData['folder']:
