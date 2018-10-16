@@ -22,6 +22,7 @@ __version__ = "0.8-devel"
 import os
 import sys
 import time
+import datetime
 import re
 import requests
 import json
@@ -151,33 +152,23 @@ def fixname(t, d):
 			v['genre'] = a.groupdict()["genre"]
 			v['description'] = a.groupdict()["description"]
 
+###
+### You can test regexp with online site https://regex101.com/
+###
+## Series
+	if not has_match: v=lookfor("series", "(Kausi (?P<season>\d+). (Jakso )?)?(?P<episode>\d+)/\d+\. ?(?P<description>.*)$", v)
+# Broken? Matches to:
+#	if not has_match: v=lookfor("series", "(Kausi (?P<season>\d+), (Jakso |Osa )?)?(?P<episode>\d+)(/\d+)?\. ?(?P<description>.*)$", v)
+	if not has_match: v=lookfor("series", "^(?P<episode>\d+)/\d+( - (?P<eptitle>.*?))?([\?!\.]+) (?P<description>.*)$", v)
+	if not has_match: v=lookfor("series", "Uusia jaksoja|Uusi kausi|Sarja alkaa", v)
+
+## Movies
 # Behind Enemy Lines - Vihollisen keskellä, USA, 2001. O: John Moore P: Owen Wilson, Gene Hackman. Amerikkalaist
 # Agent Cody Banks 2: Destination London, USA 2004. O. Kevin Allen. P: Frankie Mun
 # 28 Days Later, Britannia, 2002. O: Danny Boyle. P: Cillian Murphy, Naomie Harris
 # 28 Weeks Later,UK/Espanja,2007. O: Juan Carlos Fresnadillo. P: Robert Carlyle, Rose Byrne, Jeremy Renner. Lont
 # 1
-	if not has_match: v=lookfor("movie", "^(?P<name>[\d\wöäåÖÄÅøé\' ,:&\-\.]{1,45})(, ?)(?P<country>[\wöäåÖÄÅ/\-]+?)(, ?| )(?P<year>(19|20)\d\d)\. (?P<description>.*)$", v)
-
-# (Dans la maison, Ranska 2012) François Ozonin ohjaama draama äidinkielen opett
-# (La loi du marché, Ranska 2015) Mm. Cannesissa palkittu elokuva työttömästä
-# (Histoire immortelle/The Immortal Story, Ranska 1968) Orson Wellesin harvinainen
-# (The Secret Life Of Walter Mitty, USA 2013) Walter Mitty työskentelee Life-lehd
-# (My Old Lady, Englanti 2014) Sympaattisessa komediassa amerikkalainen tyhjätask
-# 2
-	if not has_match: v=lookfor("movie", "^\((?P<name>[\d\wöäåÖÄÅøé\' ,:&\-\./]{1,40}), (?!The|A)(?P<country>[\wöäåÖÄÅ/\-]+?) (?P<year>(19|20)\d\d)\)\.? ?(?P<description>.*)$", v)
-
-# (USA 2012) Palkittu fantasiadraama kertoo kuusivuotiaasta Hushpuppy-tytöstä, j
-# (Suomi 2015) Viktor Kärppä joutuu tahtomattaan keskelle Venäjän sisäistä v
-# (Korea/Ranska 2013) Toiminnallinen scifijännäri uudelle jääkaudelle ajautunu
-# (Ruotsi, 2016) Pahasti velkaantunut kirjailija joutuu pestautumaan satamatyölä
-# 3 
-	if not has_match: v=lookfor("movie", "^\((?P<country>(USA|Suomi|Ruotsi|Britannia|Korea/Ranska)),? (?P<year>(19|20)\d\d)(, \d+')?\)\.? (?P<description>.*)$", v)
-
-# (New Police Story/Hongkong-Kiina 2004). Poliisin eliittiryhmää johtava komisar
-# (Die Hard: With A Vengeance/USA 1995). Vauhdikas toimintatrilleri käynnistyy, k
-# (Mission: Impossible - Ghost Protocol/USA 2011). Menestyselokuvasarjan toiseksi
-# 4
-	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45})/(?P<country>[\wöäåÖÄÅ/\-]+?) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+	if not has_match: v=lookfor("movie", "^(?P<name>[\d\wöäåÖÄÅøé\' ,:&\-\.]{1,45})(, ?)(?P<country>[\wöäåÖÄÅ\/\-]+?)(, ?| )(?P<year>(19|20)\d\d)\. (?P<description>.*)$", v)
 
 # (Inside Man, trilleri, USA, 2006) Naamioituneet ryöstäjät linnoittautuvat man
 # (Charlie St. Cloud, draama, USA, 2010) Charliella on kyky nähdä edesmennyt vel
@@ -187,14 +178,40 @@ def fixname(t, d):
 # (The International, trilleri, USA, Saksa, Iso-Britannia, 2009) Interpolin agentt
 # (Wanted, toiminta, USA, Saksa, 2008) Wesley elää tylsää kirjanpitäjän elämää, ku
 # (Two Brothers, draama, Ranska, iso-Britannia, 2004) 97 min. Villieläinkertomus
+# (Easy A, komedia, USA, 2010) Olive on terävä ja omapäinen lukiolaistyttö, jonka 
+# (EDtv, komedia, USA, 1999) Ed on tuiki tavallinen kaveri, joka on töissä videovu
+# (Duplicity, trilleri, USA, 2009) CIA-agentti Claire Stenwick (Julia Roberts) ja 
+# (E.T. the Extra-Terrestrial, USA 1982) Neljällä Oscarilla palkittu valloittava k
+# 2
+	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45}), (?!USA)(?P<genre>[\wä\-\/ ]+), (?P<country>[\wöäåÖÄÅ\/\-]+(, [\wöäåÖÄÅ\/\-]+)?), (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+# (Dans la maison, Ranska 2012) François Ozonin ohjaama draama äidinkielen opett
+# (La loi du marché, Ranska 2015) Mm. Cannesissa palkittu elokuva työttömästä
+# (Histoire immortelle/The Immortal Story, Ranska 1968) Orson Wellesin harvinainen
+# (The Secret Life Of Walter Mitty, USA 2013) Walter Mitty työskentelee Life-lehd
+# (My Old Lady, Englanti 2014) Sympaattisessa komediassa amerikkalainen tyhjätask
+# (Echelon Conspiracy, USA, 2009) Max Peterson saa lahjaksi puhelimen, johon saap
+# 3
+	if not has_match: v=lookfor("movie", "^\((?P<name>[\d\wöäåÖÄÅøé\' ,:&\-\.\/]{1,40}), (?!The|A)(?P<country>[\wöäåÖÄÅ\/\-]+?),? (?P<year>(19|20)\d\d)\)\.? ?(?P<description>.*)$", v)
+
+# (USA 2012) Palkittu fantasiadraama kertoo kuusivuotiaasta Hushpuppy-tytöstä, j
+# (Suomi 2015) Viktor Kärppä joutuu tahtomattaan keskelle Venäjän sisäistä v
+# (Korea/Ranska 2013) Toiminnallinen scifijännäri uudelle jääkaudelle ajautunu
+# (Ruotsi, 2016) Pahasti velkaantunut kirjailija joutuu pestautumaan satamatyölä
+# 4 
+	if not has_match: v=lookfor("movie", "^\((?P<country>(USA|Suomi|Ruotsi|Britannia|Korea/Ranska)),? (?P<year>(19|20)\d\d)(, \d+')?\)\.? (?P<description>.*)$", v)
+
+# (New Police Story/Hongkong-Kiina 2004). Poliisin eliittiryhmää johtava komisar
+# (Die Hard: With A Vengeance/USA 1995). Vauhdikas toimintatrilleri käynnistyy, k
+# (Mission: Impossible - Ghost Protocol/USA 2011). Menestyselokuvasarjan toiseksi
 # 5
-	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45}), (?!USA)(?P<genre>[\wä\-/ ]+), (?P<country>[\wöäåÖÄÅ/\-]+(, [\wöäåÖÄÅ/\-]+)?), (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+	if not has_match: v=lookfor("movie", "^\((?P<name>[\wöäåÖÄÅøé\' ,:&\-\.]{1,45})/(?P<country>[\wöäåÖÄÅ/\-]+?) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 # 6
-	if not has_match: v=lookfor("movie", "^\((?P<name>[\w ]+)/(?P<country>[\wöäåÖÄÅ/\-]{1,40}) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+	if not has_match: v=lookfor("movie", "^\((?P<name>[\w ]+)\/(?P<country>[\wöäåÖÄÅ\/\-]{1,40}) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 
 # (/Saksa-Britannia-USA-Espanja 2006). Sharon Stone palaa kirjailija Catherine Tra
+# (The Core/Britannia - USA 2003). Tiiviillä toiminnalla ja komeilla erikoistehost
 # 7
-	if not has_match: v=lookfor("movie", "^\(/(?P<country>[\wöäåÖÄÅ/\-]{1,40}) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
+	if not has_match: v=lookfor("movie", "^\((?P<name>[\w ]+)?\/(?P<country>[\wöäåÖÄÅ\/\- ]{1,40}) (?P<year>(19|20)\d\d)\)\.? (?P<description>.*)$", v)
 
 # (Ocean's Thirteen 2007). Steven Soderberghin supertähdillä ryyditetty rikoskom
 # (Interstellar 2014). Henkeäsalpaava, tulevaisuuteen sijoittuva tieteiselokuva a
@@ -213,8 +230,7 @@ def fixname(t, d):
 	if not has_match: v=lookfor("movie", "(?P<country>[\wöäåÖÄÅ/\-]{1,40}) (?P<year>(19|20)\d\d)\.?$", v)
 	if not has_match: v=lookfor("movie", "^\((?P<name>\w+?)\)\.? (?P<description>.*)$", v)
 
-## Series
-	if not has_match: v=lookfor("series", "^(Kausi (?P<season>\d+). (Jakso )?)?(?P<episode>\d+)/\d+\. ?(?P<description>.*)$", v)
+
 
 #	print "MATCH",has_match,lookforcheck
 ### NOT MOVIE OR EPISODE? Maybe we have eptitle anyway?
@@ -223,8 +239,8 @@ def fixname(t, d):
 		if v['title'] in ['Ihmemies MacGyver', 'Myytinmurtajat']:
 			v['type'] = 'Series'
 		else:
-# We know that " O: " and " N: " in description is for director and lead
-# woman.  Usually indication of movie.
+# We know that " O: " and " N: " in description is for director and lead woman.
+# Usually indication of movie. Well, this seems to hit documentaries also.
 			a=re.search(' [ON]: ', v['description'])
 			if a:
 				v['type'] = "Movie"
@@ -237,12 +253,22 @@ def fixname(t, d):
 		v['type'] = 'Series'
 		for b in a.groupdict(): v[b] = a.groupdict()[b]
 
-	if not v.has_key('name'):
-		v['name'] = v['title']
-	filename = v['name']
+	if not v.has_key('name'): v['name'] = None
+	if not v.has_key('year'): v['year'] = None
+	filename = v['title']
+
+	v['title'] = re.sub('%s - ' % v['name'], '', v['title'])
+
+	if v['name']: v['name'] = re.sub(r'(.+), (The|a)$', '\g<2> \g<1>', v['name'], re.IGNORECASE)
+	if v['name'] == v['title']: v['name'] = None
+	#if v['name']: v['name'] = re.sub(v['title'], '', v['name'])
+
+
+#	print show_vars(v)
+#	sys.exit(1)
 	if v['type'] in ['Series']:
+		if not v['name']: v['name'] = v['title']
 ### Add "SxxExx - eptitle" to title
-		v['name'] = v['title']
 		if v.has_key('season') and v['season']:
 			v['name'] = v['name'] + " - S%02d" % int(v['season'])
 		if v.has_key('episode'):
@@ -251,41 +277,64 @@ def fixname(t, d):
 			v['name'] = v['name'] + "E%02d" % int(v['episode'])
 
 ### If series, first sentence is title (only if less then 50 chars)
-		a=re.search("^(?P<eptitle>[\wöäåÖÄÅ \-/,]{2,50})[!\?\.]{1,3}( {1,2}(?P<description>.*))?$", v['description'])
-		if a:
-			for b in a.groupdict(): v[b] = a.groupdict()[b]
+		if not v.has_key('eptitle'):
+			a=re.search("^(?P<eptitle>[\wöäåÖÄÅ \-/,]{2,50})[!\?\.]{1,3}( {1,2}(?P<description>.*))?$", v['description'])
+			if a:
+				for b in a.groupdict(): v[b] = a.groupdict()[b]
 
 		if v.has_key("eptitle"): v['name'] = "%s - %s" % (v['name'], v['eptitle'])
-
-	if v['type'] in ['Movie']:
-		if not v.has_key('year'): v['year'] = 'xxxx'
+		filename = v['name']
+	else:
 
 # We want to move The and a AFTER title, like:
 # "Martian, The - Yksin Marsissa (2015)" so file sort would work.
-		t = re.sub(r'^(The|a) (.+)$', '\g<2>, \g<1>', t, re.IGNORECASE)
-		if not v.has_key('name'):
-			v['name'] = t
-		else:
-			v['name'] = re.sub(r'^(The|a) (.+)$', '\g<2>, \g<1>', v['name'], re.IGNORECASE)
+		if v['name']: v['name'] = re.sub(r'^(The|a) (.+)$', '\g<2>, \g<1>', v['name'], re.IGNORECASE)
+#		if not v.has_key('name'):
+#			v['name'] = t
+#		else:
+#
+#		filename = v['name']
+#
+#		t = "%s" % v['name']
+#		if v['year']: t = t+" (%s)" % v['year']
+#		if v['title'] and v['title'] != v['name']: t = t+" - %s" % v['title']
+#
+#		if t.lower() != v['name'].lower():
+#			t=re.sub(re.sub(', The','', v['name']), '', t)
+#			t=re.sub(v['name']+" - ", '', t)
+#			v['name']=re.sub(" - "+t, '', v['name'])
+#			v['name']="%s - %s" % (v['name'], t)
+## NAME BUILDER
+#		v['name'] = re.sub(' -  - ',' - ',v['name'])
+#		v['name'] = "%s (%s)" % (v['name'], v['year'])
 
-		filename = v['name']
-		if t.lower() != v['name'].lower():
-			t=re.sub(re.sub(', The','', v['name']), '', t)
-			t=re.sub(v['name']+" - ", '', t)
-			v['name']=re.sub(" - "+t, '', v['name'])
-			v['name']="%s - %s" % (v['name'], t)
-		v['name'] = re.sub(' -  - ',' - ',v['name'])
-		v['name'] = "%s (%s)" % (v['name'], v['year'])
+#	if v.has_key('match'): del v["match"]
+	if v['name']: v['name'] = re.sub(r'[\\\/*?:"<>|]',"_",v['name'])
+	v['title'] = re.sub(r'[\\\/*?:"<>|]',"_",v['title'])
 
-	if v.has_key('match'): del v["match"]
-	v['name'] = re.sub(r'[\\/*?:"<>|]',"_",v['name'])
-	v['title'] = re.sub(r'[\\/*?:"<>|]',"_",v['title'])
+	if v['title']: v['title'] = re.sub(r'^(The|a) (.+)$', '\g<2>, \g<1>', v['title'], re.IGNORECASE)
+	if v['name']: v['name'] = re.sub(r'^(The|a) (.+)$', '\g<2>, \g<1>', v['name'], re.IGNORECASE)
 
-	filename = "%s/%s" % (v['type'].lower(), v['name'])
 	if v['type'] == "Series":
-		filename = "%s/%s/%s" % (v['type'].lower(), v['title'], v['name'])
+		filename = "%s/%s" % (v['title'], v['name'])
+	else:
+		if not v['name']:
+			if v['year']:
+				filename = "%s (%s)" % (v['title'], v['year'])
+			else:
+				filename = "%s" % (v['title'])
+		else:
+			if v['year']:
+				filename = "%s (%s) - %s" % (v['name'], v['year'], v['title'])
+			else:
+				filename = "%s - %s" % (v['name'], ['title'])
 
-	return filename
+
+# **TODO** Testmode
+#	print show_vars(v)
+#	print filename
+#	sys.exit(0)
+	return "%s/%s" % (v['type'].lower(), filename)
 
 ### -----------------------------------------------------------------------
 ### Support functions
@@ -542,8 +591,8 @@ def testVar(varFile = None):
 		print "%s is not var-file or it is broken" % varFile
 		sys.exit(1)
 
-	print "Channel:",varData["channelName"]
-	print "Type:",varData["showType"]
+	if varData.has_key('channelName'): print "Channel:",varData["channelName"]
+	if varData.has_key('showType'): print "Type:",varData["showType"]
 	print "Start:",varData["startTime"]
 	print
 	print "Title:",varData['name']
@@ -731,19 +780,49 @@ def fileRename(doFile = None):
 		sys.exit(1)
 
 	nameDir, nameFile = os.path.split(doFile)
-	nameFile = re.sub('(-formats|-var)?.(txt|mp4|var)$', '', nameFile)
+	nameFile = re.sub('(-formats|-var)?\.(txt|mp4|var|info)?$', '', nameFile)
+
+	if not nameDir: nameDir="."
+	varData={}
+	if not os.path.exists("%s/%s-var.txt" % (nameDir, nameFile)):
+		if os.path.exists("%s/%s.info" % (nameDir, nameFile)):
+			fp=open('%s/%s.info' % (nameDir, nameFile),'r')
+		else:
+			fp=open('%s/%s.txt' % (nameDir, nameFile), 'r')
+
+		time=None
+		name=None
+		desc=None
+		while 1:
+			line=fp.readline()
+			if not line: break
+			if line[0:2] == "T ": name=line[2:-1]
+			if line[0:2] == "D ": desc=line[2:-1]
+			if line[0:2] == "E ": time=re.sub("^E (\d{1,2})\.(\d{1,2})\.(\d{4}).* (\d{2}):(\d{2}):(\d{2}).*$", "\g<3> \g<2> \g<1> \g<4> \g<5> \g<6>", line[:-1]).split(" ")
+
+		if not name and not desc:
+			print "Can't create -var.txt for file, no metadata files found"
+			fatal=True
+			return
+		if time[0] == "E": varData['startTime'] = datetime.date.fromtimestamp(int(time[2])).strftime('%Y-%m-%d %H:%M:%S')
+		else: varData['startTime'] = '%4d-%02d-%02d %02d:%02d:%02d' % (int(time[0]), int(time[1]), int(time[2]), int(time[3]), int(time[4]), int(time[5]))
+		varData['name'] = name
+		varData['description'] = desc
+
+		save_vars(varData, "%s/%s-var.txt" % (nameDir, nameFile))
+		fp.close()
 
 	if nameDir: doFile = "%s/%s" % (nameDir, nameFile)
 	else: doFile = nameFile
-	if os.path.exists("%s.var" % doFile): varFile="%s.var" % doFile
-	else: varFile="%s-var.txt" % doFile
+	if os.path.exists("%s/%s.var" % (nameDir, doFile)): varFile="%s/%s.var" % doFile
+	else: varFile="%s/%s-var.txt" % (nameDir, doFile)
 	try:
-		varData=load_vars(varFile)
+		if not varData or len(varData) < 3: varData=load_vars(varFile)
 	except IOError as err:
-		print "%s: %s-var.txt" % (err.strerror, doFile)
+		print "%s: %s/%s-var.txt" % (err.strerror, nameDir, doFile)
 		sys.exit(1)
 
-	childFiles=glob.glob(doFile+"*")
+	childFiles=glob.glob(doFile+"[-.]*")
 	toFile=fixname(varData['name'], varData['description'])
 
 	if len(childFiles) > 6:
@@ -757,15 +836,20 @@ def fileRename(doFile = None):
 	FixName=re.sub('\]','\]',FixName)
 
 	# Loop all thru first, just to make sure that target does not exist
+	toDir, toFName = os.path.split(toFile)
+	if not nameDir: toFile = toFName
+
+	fatal=None
 	for fromFile in childFiles:
 		ext=re.sub(FixName, '', fromFile)
 		if os.path.exists('%s%s' % (toFile, ext)):
 			print "Fatal, target exists: %s%s" % (toFile, ext)
-			sys.exit(1)
+			fatal=True
+			break
+	if fatal: return
 
-	toDir, toFName = os.path.split(toFile)
 	try:
-		if not os.path.exists(toDir):
+		if nameDir and not os.path.exists(toDir):
 			os.makedirs(toDir, 0755)
 	except IOError as err:
 		print "%s: %s" % (err.strerror, doDir)
@@ -773,12 +857,13 @@ def fileRename(doFile = None):
 
 	for fromFile in childFiles:
 		ext=re.sub(FixName, '', fromFile)
-		try:
+#		try:
+		if 1:
 			os.rename(fromFile, "%s%s" % (toFile, ext))
 			print "'%s' -> '%s%s'" % (fromFile, toFile, ext)
-		except OSError as err:
-			print "%s: %s-var.txt" % (err.strerror, doFile)
-			continue
+#		except OSError as err:
+#			print "%s: %s-var.txt" % (err.strerror doFile)
+#			continue
 	return
 
 
@@ -843,8 +928,7 @@ def findProgram(doFile = None):
 ### -----------------------------------------------------------------------
 ### Func: getProgram
 ### -----------------------------------------------------------------------
-def getProgram(programId):
-#	if checkQuit(): return # /InfiniteLoop
+def getProgram(programId, tmpdir="/tmp"):
 	program = fullData['program'][int(programId)]
 
 	fromFolder=None
@@ -857,28 +941,36 @@ def getProgram(programId):
 		if fromFolder: break
 			
 	oldName="%s (%s)" % (re.sub('^(AVA |\w+)?(#Subleffa|Sub Leffa|Elokuva|leffa|torstai|perjantai)(:| -) | \(elokuva\)|Kotikatsomo(:| -) |R&A(:| -) |(Dokumenttiprojekti|(Kreisi|Toiminta)komedia|(Hirviö|Katastrofi|Kesä)leffa|Lauantain perheleffa)(:| -) |^(Uusi )?Kino( Klassikko| Kauko| Suomi| Into| Helmi| Tulio|Rock| Klassikko| Teema)?(:| -) ?','',program['name']), re.sub(r'(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):\d\d','\g<1>\g<2>\g<3>_\g<4>\g<5>',program['startTime']))
-	filename = fixname(program['name'],program['description'])
-	fileDir, fileName=os.path.split(filename)
+	fullFileName = fixname(program['name'],program['description'])
+	fileDir, fileName=os.path.split(fullFileName)
 
+	if checkQuit(): return # /InfiniteLoop
 # Verify that target directory does exist
 	if not os.path.exists(osfilename(fileDir)): os.makedirs(osfilename(fileDir), 0755)
 
-	if os.path.exists("%s.mp4" % osfilename(filename)):
-		print "DUPE %s: %s.mp4" % (programId, filename)
+	if os.path.exists("%s.mp4" % osfilename(fullFileName)):
+		print "DUPE %s: %s.mp4" % (programId, fullFileName)
 		file=open("elisa-dl.log", 'a')
-		file.write("DUPE %s: %s.mp4\n" % (programId, filename))
+		file.write("DUPE %s: %s.mp4\n" % (programId, fullFileName))
 		file.close()
 		if config['moveDupes'] and config['donedir']:
 			moveRecord(programId, config['donedir'], fromFolder)
 	else:
-		tmpFile = osfilename("tmp/%s" % fileName)
+		if not os.path.exists(tmpdir): os.makedirs(tmpdir, 0755)
+		tmpFile = osfilename("%s/%s" % (tmpdir, fileName))
 
 		save_vars(program, tmpFile+"-var.txt")
-		file=open(tmpFile+'.txt', 'w')
-		file.write(program['description'].encode('utf8'))
-		file.close()
+# Disable writing of description, no usage for it? Also we have -var file.
+#		file=open(tmpFile+'.txt', 'w')
+#		file.write(program['description'].encode('utf8'))
+#		file.close()
 
-		if not os.path.exists("%s.mp4" % tmpFile):
+		if not os.path.exists("%s/%s.mp4" % (tmpdir, tmpFile)):
+			print "Found program from temp %s: %s" % (programId, fullFileName)
+			file=open("elisa-dl.log", 'a')
+			file.write("Move from temp %s: %s.mp4\n" % (programId, fullFileName))
+			file.close()
+		else:
 # Verify that we are logged in
 			auth=login()
 # Retrieve download URL for program
@@ -886,20 +978,15 @@ def getProgram(programId):
 			getRecordingUrl=requests.get(url, headers=auth)
 			recordingUrl=json.loads(getRecordingUrl.text)
 
-			tmpFile = doDownload("%s" % tmpFile, recordingUrl["url"], programId)
+			tmpFile = doDownload("%s/%s" % (tmpdir, tmpFile), recordingUrl["url"], programId)
 # I hope that this helps to interrupt that record is not moved to Done directory in case of CTRL-C quit
 			time.sleep(1)
-		else:
-			print "Found program from temp %s: %s" % (programId, filename)
-			file=open("elisa-dl.log", 'a')
-			file.write("Move from temp %s: %s.mp4\n" % (programId, filename))
-			file.close()
 
 		if tmpFile:
 			time.sleep(1)
 			if config['donedir']:
 				moveRecord(programId, config['donedir'])
-			fileRename("%s.mp4" % tmpFile)
+			fileRename("%s/%s.mp4" % (tmpdir, tmpFile))
 	return
 
 
@@ -959,25 +1046,25 @@ def cacheFullData(force=None):
 ### Startup
 ### -----------------------------------------------------------------------
 if __name__ == "__main__":
-	loadConfig()
-# Make cache and temp directories if does not exist
-	if not os.path.exists('var'): os.makedirs('var', 0755)
-	if not os.path.exists('tmp'): os.makedirs('tmp', 0755)
-
 # Show metadata from var- file
 	if not sys.argv[1:]:
 		pass
 	elif sys.argv[1:][0] == "filename" or sys.argv[1:][0] == "test":
 		if len(sys.argv) >= 3:
 			testVar(sys.argv[2:][0])
+			sys.exit(0)
 # Rename files by data from var- file
 	elif sys.argv[1:][0] == "rename":
 		if len(sys.argv) >= 3:
 			for i, fn in enumerate(sys.argv[2:]):
 				fileRename(fn)
+			sys.exit(0)
 
 # All other needs data from server/cache
+	loadConfig()
 	auth=login()
+# Make cache and temp directories if does not exist
+	if not os.path.exists('var'): os.makedirs('var', 0755)
 	fullData = cacheFullData()
 
 # Without argument, download all
@@ -1002,7 +1089,7 @@ if __name__ == "__main__":
 			for p in sys.argv[2:]:
 				for programId in p.split(","):
 					if programId:
-						getProgram(programId)
+						getProgram(programId, tmpdir=".")
 # Look from fullData.var by filename
 	elif sys.argv[1:][0] == "lookup" or sys.argv[1:][0] == "find":
 		if len(sys.argv) >= 3:
