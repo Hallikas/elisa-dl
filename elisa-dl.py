@@ -782,12 +782,14 @@ def fileRename(doFile = None):
 	nameDir, nameFile = os.path.split(doFile)
 	nameFile = re.sub('(-formats|-var)?\.(txt|mp4|var|info)?$', '', nameFile)
 
+	print doFile
+	sys.exit(1)
 	if not nameDir: nameDir="."
 	varData={}
 	if not os.path.exists("%s/%s-var.txt" % (nameDir, nameFile)):
 		if os.path.exists("%s/%s.info" % (nameDir, nameFile)):
 			fp=open('%s/%s.info' % (nameDir, nameFile),'r')
-		else:
+		elif os.path.exists("%s/%s.txt" % (nameDir, nameFile)):
 			fp=open('%s/%s.txt' % (nameDir, nameFile), 'r')
 
 		time=None
@@ -814,12 +816,12 @@ def fileRename(doFile = None):
 
 	if nameDir: doFile = "%s/%s" % (nameDir, nameFile)
 	else: doFile = nameFile
-	if os.path.exists("%s/%s.var" % (nameDir, doFile)): varFile="%s/%s.var" % doFile
-	else: varFile="%s/%s-var.txt" % (nameDir, doFile)
+	if os.path.exists("%s.var" % (doFile)): varFile="%s.var" % (doFile)
+	else: varFile="%s-var.txt" % (doFile)
 	try:
 		if not varData or len(varData) < 3: varData=load_vars(varFile)
 	except IOError as err:
-		print "%s: %s/%s-var.txt" % (err.strerror, nameDir, doFile)
+		print "%s: %s-var.txt" % (err.strerror, doFile)
 		sys.exit(1)
 
 	childFiles=glob.glob(doFile+"[-.]*")
@@ -928,7 +930,7 @@ def findProgram(doFile = None):
 ### -----------------------------------------------------------------------
 ### Func: getProgram
 ### -----------------------------------------------------------------------
-def getProgram(programId, tmpdir="/tmp"):
+def getProgram(programId, tmpdir="tmp"):
 	program = fullData['program'][int(programId)]
 
 	fromFolder=None
@@ -959,18 +961,20 @@ def getProgram(programId, tmpdir="/tmp"):
 		if not os.path.exists(tmpdir): os.makedirs(tmpdir, 0755)
 		tmpFile = osfilename("%s/%s" % (tmpdir, fileName))
 
-		save_vars(program, tmpFile+"-var.txt")
-# Disable writing of description, no usage for it? Also we have -var file.
-#		file=open(tmpFile+'.txt', 'w')
-#		file.write(program['description'].encode('utf8'))
-#		file.close()
-
-		if not os.path.exists("%s/%s.mp4" % (tmpdir, tmpFile)):
+		if os.path.exists("%s.mp4" % (tmpFile)):
 			print "Found program from temp %s: %s" % (programId, fullFileName)
 			file=open("elisa-dl.log", 'a')
 			file.write("Move from temp %s: %s.mp4\n" % (programId, fullFileName))
 			file.close()
 		else:
+			tmpFile = osfilename("%s/%s" % (tmpdir, fileName))
+
+			save_vars(program, tmpFile+"-var.txt")
+# Disable writing of description, no usage for it? Also we have -var file.
+#		file=open(tmpFile+'.txt', 'w')
+#		file.write(program['description'].encode('utf8'))
+#		file.close()
+
 # Verify that we are logged in
 			auth=login()
 # Retrieve download URL for program
@@ -978,7 +982,7 @@ def getProgram(programId, tmpdir="/tmp"):
 			getRecordingUrl=requests.get(url, headers=auth)
 			recordingUrl=json.loads(getRecordingUrl.text)
 
-			tmpFile = doDownload("%s/%s" % (tmpdir, tmpFile), recordingUrl["url"], programId)
+			tmpFile = doDownload("%s" % (tmpFile), recordingUrl["url"], programId)
 # I hope that this helps to interrupt that record is not moved to Done directory in case of CTRL-C quit
 			time.sleep(1)
 
@@ -986,7 +990,14 @@ def getProgram(programId, tmpdir="/tmp"):
 			time.sleep(1)
 			if config['donedir']:
 				moveRecord(programId, config['donedir'])
-			fileRename("%s/%s.mp4" % (tmpdir, tmpFile))
+#			print tmpdir		# /tmp
+#			print tmpFile		# /tmp/Ghosts of Girlfriends Past (2009) - Pelimiehen painajainen
+#			print fileDir		# movie
+#			print fileName		# Ghosts of Girlfriends Past (2009) - Pelimiehen painajainen
+#			print fullFileName	# movie/Ghosts of Girlfriends Past (2009) - Pelimiehen painajainen
+#			print oldName		# Pelimiehen painajainen (7) (20181016_2200)
+#			sys.exit(1)
+			fileRename("%s.mp4" % (tmpFile))
 	return
 
 
