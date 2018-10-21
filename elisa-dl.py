@@ -61,6 +61,8 @@ config['infiniteLoop']=False
 config['moveDupes']=True
 config['usecache']=True
 config['debugmode']=False
+# Wait at least 120 minutes after recording is ready, so Elisa has done their conversion.
+config['getAge']=120
 
 # Usually best
 platformFormat='ios'
@@ -1060,6 +1062,12 @@ def getProgram(programId, tmpdir="tmp"):
 
 	if fullData['program'][int(programId)]['recordingState'] not in ['finished']:
 		print "Program recording is not yet finnished."
+		return
+	recAge=round(time.time()-(program['endTimeUTC']/1000), 0)/60
+	if recAge < config['getAge']:
+		print "All formats may not be available yet."
+		doLog("Record %d (%s) is only %d minutes old (< %d min)." % (programId, fullData['program'][int(programId)]['name'], recAge, config['getAge']))
+		time.sleep(1)
 		return
 
 	fromFolder=None
