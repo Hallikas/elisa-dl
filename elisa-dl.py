@@ -29,6 +29,8 @@ import json
 import subprocess 
 import glob
 
+global config
+
 config = {}
 
 # You should not touch these!
@@ -53,11 +55,17 @@ disableAPI = False
 
 config['os']="unix"
 config['donedir']=None
+config['faildir']=None
 config['loopsleep']=60
 config['infiniteLoop']=False
 config['moveDupes']=True
 config['usecache']=True
+config['debugmode']=False
 
+# Usually best
+platformFormat='ios'
+# If you have problems with 'ios'
+#platformFormat='online_wv'
 
 # Force utf8 encoding
 reload(sys)
@@ -191,6 +199,7 @@ def fixname(t, d, knowntype=None, knownvars=None):
 ### You can test regexp with online site https://regex101.com/
 ###
 ## Series
+	if not has_match: v=lookfor("series", "(?P<episode>\d+)/\d+\. ?(?P<description>.+) (?P<season>\d+)\. tuotantokausi", v)
 	if not has_match: v=lookfor("series", "(Kausi (?P<season>\d+)[.,] (Jakso |osa )?)?(?P<episode>\d+)/\d+\. ?(?P<description>.*)$", v)
 # Broken? Matches to:
 	if not has_match: v=lookfor("series", "Kausi (?P<season>\d+)[.,] (Jakso |osa )?(?P<episode>\d+)(/\d+)?\. ?(?P<description>.*)$", v)
@@ -358,7 +367,10 @@ def fixname(t, d, knowntype=None, knownvars=None):
 	if v['name']: v['name'] = re.sub(r'^(The|[aA]) (.+)$', '\g<2>, \g<1>', v['name'])
 
 	if v['type'].lower() == 'series':
-		filename = "%s/%s" % (v['title'], v['name'])
+		if v.has_key('season') and v['season']:
+			filename = "%s/Season %02d/%s" % (v['title'], int(v['season']), v['name'])
+		else:
+			filename = "%s/%s" % (v['title'], v['name'])
 	else:
 		if not v['name']:
 			if v['year']:
@@ -697,6 +709,9 @@ def loadConfig():
 		a=re.search('^donedir\s*=\s*(?P<donedir>[\d]+)',line,re.IGNORECASE)
 		if a:
 			config['donedir']=int(a.groupdict()['donedir'])
+		a=re.search('^faildir\s*=\s*(?P<faildir>[\d]+)',line,re.IGNORECASE)
+		if a:
+			config['faildir']=int(a.groupdict()['faildir'])
 		a=re.search('^dodirs\s*=\s*(?P<dodirs>[\d]+)',line,re.IGNORECASE)
 		if a:
 			config['doDirs']=[ int(a.groupdict()['dodirs']) ]
@@ -734,15 +749,17 @@ def doDownload(filename, recordingUrl, programId):
 #	filename = osfilename(filename)
 
 	# If you need to debug formats
-#	if not os.path.exists(osfilename(filename)+"-formats.txt"):
-#		cmd='youtube-dl --list-formats \"'+recordingUrl+'\"'
-#		file=open(osfilename(filename)+'-formats.txt', 'w')
-#		strFormats=subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-#		file.write(strFormats)
-#		file.close()
+	if 0 and not os.path.exists(osfilename(filename)+"-formats.txt"):
+		cmd='youtube-dl --list-formats \"'+recordingUrl+'\"'
+		file=open(osfilename(filename)+'-formats.txt', 'w')
+		strFormats=subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+		file.write(strFormats)
+		file.close()
+#	print filename
+#	sys.exit(1)
 
 # Limit bitrate to 3Mbit and sub FullHD resoluition, if available.
-	filt_video='bestvideo[tbr<=?3000]/bestvideo[width<=1920][height<=1080]/bestvideo'
+	filt_video='bestvideo[ext=mp4][tbr<=?3000]/bestvideo[ext=mp4][width<=1920][height<=1080]/bestvideo[ext=mp4]'
 # Limit audio to 192 aac, prefer Finnish track first, always try skip eac3 because problems with ffmpeg
 	filt_audio="bestaudio[format_id*=aacl-192][format_id*=Finnish]/bestaudio[format_id*=AACL_mul_192]/bestaudio[format_id!=audio-ec-3-224-Multiple_languages]"
 
@@ -784,7 +801,8 @@ def doDownload(filename, recordingUrl, programId):
 ## Quit if Download process does not success
 	if retr:
 		doLog("ERROR With Download %s: %s.mp4\n" % (programId, filename))
-#		sys.exit(1)
+		moveRecord(programId, folderId=config['faildir'])
+		return None
 
 	return filename
 
@@ -824,18 +842,21 @@ def main():
 
 	if not fullData.has_key('program'): fullData=cacheFullData()
 	for folderId in fullData['folder']:
-		if config.has_key('doDirs') and folderId not in config['doDirs']: continue
-# Don't process doneDir
-		if folderId in [config['donedir']]: continue
+		if config.has_key('doDirs') and folderId not in config['doDirs']:
+			continue
+		if folderId in [config['donedir'], config['faildir']]:
+			continue
 		doLog("Processing folder '%s' (%d)" % (fullData['folder'][folderId]['name'], folderId))
 		if fullData['folder'][folderId]['count'] < 1: continue
 
 		getInSortedOrder = True
 		# Sort in title order and retrieve by it
+
 		if getInSortedOrder:
 			nameMap = {}
 			tmpData = fullData['program']
 			for programId in fullData['program']:
+				if int(fullData['program'][programId]['folderId']) != int(folderId): continue
 				nameMap[programId] = fullData['program'][programId]['name']
 
 			alphaSort = []
@@ -953,13 +974,11 @@ def fileRename(doFile = None):
 
 	for fromFile in childFiles:
 		ext=re.sub(FixName, '', fromFile)
-#		try:
 		if 1:
-			os.rename(fromFile, "%s%s" % (toFile, ext))
 			doLog("'%s' -> '%s%s'" % (fromFile, toFile, ext))
-#		except OSError as err:
-#			doLog("%s: %s-var.txt" % (err.strerror doFile))
-#			continue
+			if config['debugmode']:
+				break
+			os.rename(fromFile, "%s%s" % (toFile, ext))
 	return
 
 
@@ -1025,7 +1044,15 @@ def findProgram(doFile = None):
 ### Func: getProgram
 ### -----------------------------------------------------------------------
 def getProgram(programId, tmpdir="tmp"):
-	program = fullData['program'][int(programId)]
+	try:
+		program = fullData['program'][int(programId)]
+	except:
+		print "Can't find %s from database, maybe not suitable format found?" % programId
+		return
+
+	if fullData['program'][int(programId)]['recordingState'] not in ['finished']:
+		print "Program recording is not yet finnished."
+		return
 
 	fromFolder=None
 	for folderId in fullData['folder']:
@@ -1038,22 +1065,28 @@ def getProgram(programId, tmpdir="tmp"):
 	if checkQuit(): return # /InfiniteLoop
 			
 # **TODO** We have this now in three different places, we should make function out of this
-	epinfo=None
-	if program.has_key('series') and program.has_key('seriesId') and program['seriesId'] > 0:
-		epinfo={}
-		if program['series'].has_key('season'): epinfo['season'] = program['series']['season']
-		if program['series'].has_key('episode'): epinfo['episode'] = program['series']['episode']
-		if program['series'].has_key('episodeName'): epinfo['eptitle'] = program['series']['episodeName']
-		epinfo['type'] = 'series'
+	try:
+		epinfo=None
+		if not program.has_key('description'):
+			program['description'] = ''
+		if program.has_key('series') and program.has_key('seriesId') and program['seriesId'] > 0:
+			epinfo={}
+			if program['series'].has_key('season'): epinfo['season'] = program['series']['season']
+			if program['series'].has_key('episode'): epinfo['episode'] = program['series']['episode']
+			if program['series'].has_key('episodeName'): epinfo['eptitle'] = program['series']['episodeName']
+			epinfo['type'] = 'series'
 		
-	if epinfo:
-		fullFileName=fixname(program['name'], program['description'], knownvars=epinfo)
-	elif program.has_key('showType'):
-		fullFileName=fixname(program['name'], program['description'], knowntype=program["showType"].lower())
-	else:
-		fullFileName=fixname(program['name'], program['description'])
-	fileDir, fileName=os.path.split(fullFileName)
-
+		if epinfo:
+			fullFileName=fixname(program['name'], program['description'], knownvars=epinfo)
+		elif program.has_key('showType'):
+			fullFileName=fixname(program['name'], program['description'], knowntype=program["showType"].lower())
+		else:
+			fullFileName=fixname(program['name'], program['description'])
+		fileDir, fileName=os.path.split(fullFileName)
+	except:
+		print show_vars(program)
+		print program['name']
+		sys.exit(1)
 # Verify that target directory does exist
 	if not os.path.exists(osfilename(fileDir)): os.makedirs(osfilename(fileDir), 0755)
 #
@@ -1082,7 +1115,7 @@ def getProgram(programId, tmpdir="tmp"):
 # Verify that we are logged in
 			auth=login()
 # Retrieve download URL for program
-			url=apiUrl+'/recordings/url/'+str(programId)+'?platform=ios&'+apiVer
+			url=apiUrl+'/recordings/url/'+str(programId)+'?platform='+platformFormat+'&'+apiVer
 			getRecordingUrl=requests.get(url, headers=auth)
 			recordingUrl=json.loads(getRecordingUrl.text)
 
@@ -1105,7 +1138,8 @@ def cacheProgramData(folderId, force=None):
 	global apiUrl, apiVer
 
 	if force or not config['usecache'] or not os.path.exists("var/cache-fData-%d.var" % folderId):
-		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?platform=external&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
+#		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?platform=external&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
+		(r, getData) = doApiGet(apiUrl+'/recordings/folder/'+str(folderId)+'?platform='+platformFormat+'&'+apiVer+'&page=0&pageSize=10000&includeMetadata=true')
 		if (r["status"] != 200):
 			doLog("Failed to load recording data for folder %d" % (folderId), r["status"])
 			sys.exit(1)
@@ -1163,23 +1197,32 @@ if __name__ == "__main__":
 			sys.exit(0)
 # Rename files by data from var- file
 	elif sys.argv[1:][0] == "rename":
-		if len(sys.argv) >= 3:
-			for i, fn in enumerate(sys.argv[2:]):
+		del sys.argv[1]
+		if sys.argv[1:][0] == "test":
+			config['debugmode']=True
+			del sys.argv[1]
+			print "NOTE! Debug mode [ON]"
+
+		if len(sys.argv) >= 2:
+			for i, fn in enumerate(sys.argv[1:]):
 				fileRename(fn)
 			sys.exit(0)
 
+# Make cache and temp directories if does not exist
+	if not os.path.exists('var'): os.makedirs('var', 0755)
 # All other needs data from server/cache
 	loadConfig()
 	auth=login()
-# Make cache and temp directories if does not exist
-	if not os.path.exists('var'): os.makedirs('var', 0755)
 	if len(sys.argv) > 1 and sys.argv[1:][0] == "get":
-		config['usecache']=True
+		config['usecache']=False
 	fullData = cacheFullData()
+	if sys.argv[1:] and sys.argv[1:][0] == "refresh":
+		sys.exit(1)
 
 # Without argument, download all
 	if not sys.argv[1:]:
 		while firstRun or config['infiniteLoop']:
+			if not firstRun: fullData=cacheFullData()
 			firstRun = False
 			main()
 			
