@@ -726,6 +726,12 @@ def loadConfig():
 		a=re.search('^infinite-loop\s*=\s*(?P<infiniteloop>[\w\d]+)',line,re.IGNORECASE)
 		if a:
 			config['infiniteLoop']=lookYesNo(a.groupdict()['infiniteloop'])
+
+		a=re.search('^loopsleep\s*=\s*(?P<loopsleep>[\w\d]+)',line,re.IGNORECASE)
+		if a:
+			config['loopsleep']=int(a.groupdict()['loopsleep'])
+			if config['loopsleep'] < 10: config['loopsleep'] = 10
+
 	fp.close()
 
 	return config
