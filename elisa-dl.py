@@ -509,7 +509,7 @@ def doLog(t=None):
 	if not os.path.exists("elisa-dl.conf"):
 		return
 	file=open("elisa-dl.log", 'a')
-	file.write(t)
+	file.write(t+"\n")
 	file.close()
 	return
 
