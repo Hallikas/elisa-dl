@@ -1229,6 +1229,10 @@ if __name__ == "__main__":
 	if not sys.argv[1:]:
 		while firstRun or config['infiniteLoop']:
 			if not firstRun: fullData=cacheFullData()
+			if not firstRun:
+				loadConfig()
+				auth=login()
+				fullData=cacheFullData()
 			firstRun = False
 			main()
 			
