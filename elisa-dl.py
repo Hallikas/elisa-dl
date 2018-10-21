@@ -862,6 +862,8 @@ def main():
 			nameMap = {}
 			tmpData = fullData['program']
 			for programId in fullData['program']:
+				if not fullData['program'][programId].has_key('folderId'):
+					fullData['program'][programId]['folderId'] = 0
 				if int(fullData['program'][programId]['folderId']) != int(folderId): continue
 				nameMap[programId] = fullData['program'][programId]['name']
 
@@ -1228,7 +1230,6 @@ if __name__ == "__main__":
 # Without argument, download all
 	if not sys.argv[1:]:
 		while firstRun or config['infiniteLoop']:
-			if not firstRun: fullData=cacheFullData()
 			if not firstRun:
 				loadConfig()
 				auth=login()
