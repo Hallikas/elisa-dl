@@ -391,7 +391,9 @@ def fixname(t, d, knowntype=None, knownvars=None):
 #	print show_vars(v)
 #	print filename
 #	sys.exit(0)
-	return "%s/%s" % (v['type'].lower(), filename)
+	if v['type'].lower() == 'series':
+		return "%s/%s" % (v['type'].lower(), filename)
+	return "%s/%s/%s" % (v['type'].lower(), filename[0].lower(), filename)
 
 ### -----------------------------------------------------------------------
 ### Support functions
@@ -744,7 +746,7 @@ def loadConfig():
 # Check if we have quit conditions, for nice end of the program.
 def checkQuit():
 	if os.path.exists("/quit") or os.path.exists("quit"):
-		doLog("Quit requested")
+		print "Quit requested"
 		
 		return True
 	return None
@@ -854,7 +856,7 @@ def main():
 			continue
 		if folderId in [config['donedir'], config['faildir']]:
 			continue
-		doLog("Processing folder '%s' (%d)" % (fullData['folder'][folderId]['name'], folderId))
+		print "Processing folder '%s' (%d)" % (fullData['folder'][folderId]['name'], folderId)
 		if fullData['folder'][folderId]['count'] < 1: continue
 
 		getInSortedOrder = True
@@ -885,6 +887,8 @@ def main():
 ### Func: fileRename
 ### -----------------------------------------------------------------------
 def fileRename(doFile = None):
+	global config
+
 	if not doFile:
 		print "You must give file as parameter"
 		sys.exit(1)
@@ -894,11 +898,14 @@ def fileRename(doFile = None):
 
 	if not nameDir: nameDir="."
 	varData={}
+	config['genVarData'] = False
 	if not os.path.exists("%s/%s-var.txt" % (nameDir, nameFile)) and not os.path.exists("%s/%s.var" % (nameDir, nameFile)):
 		if os.path.exists("%s/%s.info" % (nameDir, nameFile)):
 			fp=open('%s/%s.info' % (nameDir, nameFile),'r')
+			config['genVarData'] = True
 		elif os.path.exists("%s/%s.txt" % (nameDir, nameFile)):
 			fp=open('%s/%s.txt' % (nameDir, nameFile), 'r')
+			config['genVarData'] = True
 		else:
 			doLog("Can't find var file for %s" % nameFile)
 			return
@@ -915,6 +922,7 @@ def fileRename(doFile = None):
 
 		if not name and not desc:
 			doLog("Can't create -var.txt for file, no metadata files found")
+			config['genVarData'] = False
 			fatal=True
 			return
 		if time:
@@ -935,6 +943,9 @@ def fileRename(doFile = None):
 	except IOError as err:
 		doLog("%s: %s-var.txt" % (err.strerror, doFile))
 		sys.exit(1)
+
+	if config['genVarData']:
+		os.remove(varFile)
 
 	childFiles=glob.glob(doFile+"[-.]*")
 	epinfo=None
@@ -1108,7 +1119,7 @@ def getProgram(programId, tmpdir="tmp"):
 #
 # We can't check if file does exist, before we really know FULL name (with eptitle)
 #
-	doLog("Full filename: %s.mp4" % osfilename(fullFileName))
+	print "Full filename: %s.mp4" % osfilename(fullFileName)
 	if os.path.exists("%s.mp4" % osfilename(fullFileName)):
 		doLog("DUPE %s: %s.mp4\n" % (programId, fullFileName))
 		if config['moveDupes'] and config['donedir']:
@@ -1189,7 +1200,7 @@ def cacheFullData(force=None):
 		fullData['program'] = {}
 		for folderId in fullData['folder']:
 			if folderId == 'program': continue
-			doLog("Reading directory %d: %s" % (folderId, fullData['folder'][folderId]['name']))
+			print "Reading directory %d: %s" % (folderId, fullData['folder'][folderId]['name'])
 			if fullData['folder'][folderId]['count'] < 1: continue
 			rData = cacheProgramData(folderId)
 			if len(rData) == 0: continue
@@ -1246,7 +1257,7 @@ if __name__ == "__main__":
 			main()
 			
 			if not config['infiniteLoop']: break
-			doLog("Sleeping for %d sec until new loop" % config["loopsleep"])
+			print "Sleeping for %d sec until new loop" % config["loopsleep"]
 			i=0
 			while i < config["loopsleep"]:
 				i=i+1
